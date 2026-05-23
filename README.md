@@ -9,7 +9,7 @@ Trainlyft AI is a premium, high-density, multi-tenant data annotation and machin
 The platform is designed around a modern polyglot architecture combining relational databases, document stores, and in-memory caches.
 
 ### 💻 Frontend
-* **Language:** TypeScript (63.7%)
+* **Language:** TypeScript
 * **Framework:** React 18 + Vite (Build System)
 * **State Management:** Redux Toolkit (Slices for auth, tasks, annotations)
 * **Styling:** Tailwind CSS + Vanilla CSS (Custom Glassmorphism design system supporting Light & Dark modes)
@@ -19,7 +19,7 @@ The platform is designed around a modern polyglot architecture combining relatio
   * Native HTML5 video player with sub-second range segment annotations.
 
 ### ⚙️ Backend
-* **Language:** Python (30.3%)
+* **Language:** Python
 * **Framework:** FastAPI (Asynchronous API gateway)
 * **Machine Learning:** `scikit-learn` (Logistic Regression + CountVectorizer) for real-time model training on approved annotations.
 * **Databases & Caching:**
