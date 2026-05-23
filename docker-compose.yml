@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: trainlyft-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: trainlyft
+      POSTGRES_USER: trainlyft_user
+      POSTGRES_PASSWORD: trainlyft_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  mongo:
+    image: mongo:6.0
+    container_name: trainlyft-mongo
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  redis:
+    image: redis:7-alpine
+    container_name: trainlyft-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: trainlyft-backend
+    restart: always
+    depends_on:
+      - postgres
+      - mongo
+      - redis
+    environment:
+      - DATABASE_URL=postgresql://trainlyft_user:trainlyft_password@postgres:5432/trainlyft
+      - MONGO_URL=mongodb://mongo:27017
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "8000:8000"
+    volumes:
+      - backend_backups:/app/backups
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: trainlyft-frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+
+volumes:
+  postgres_data:
+  mongo_data:
+  redis_data:
+  backend_backups:
