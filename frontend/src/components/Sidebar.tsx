@@ -68,7 +68,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage }) => {
   const menuItems = [
     { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'annotator', 'reviewer'] },
     { id: 'tasks', name: 'Task Management', icon: ListTodo, roles: ['admin', 'annotator', 'reviewer'] },
-    { id: 'qa', name: 'QA Review', icon: ShieldCheck, roles: ['admin', 'reviewer'] },
+    { id: 'qa', name: 'Task QA', icon: ShieldCheck, roles: ['admin', 'reviewer'] },
     { id: 'agreement', name: 'Agreement (IAA)', icon: Users, roles: ['admin'] },
     { id: 'audit', name: 'Audit Logs', icon: Database, roles: ['admin'] },
     { id: 'system-monitor', name: 'System Monitor', icon: Activity, roles: ['admin'] },

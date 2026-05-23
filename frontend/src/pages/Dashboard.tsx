@@ -423,13 +423,13 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="p-3 bg-slate-950/40 border border-slate-850 rounded-xl relative overflow-hidden">
                 <div className="absolute right-2 top-2 w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-[10px] text-emerald-400 font-semibold block">QA Approved</span>
+                <span className="text-[10px] text-emerald-400 font-semibold block">Tasks Approved</span>
                 <h3 className="text-lg font-bold text-emerald-400 mt-0.5 font-mono">{approvedCount}</h3>
                 <span className="text-[9px] text-emerald-600/80 block mt-0.5">{approvedPct.toFixed(1)}% Ratio</span>
               </div>
               <div className="p-3 bg-slate-950/40 border border-slate-850 rounded-xl relative overflow-hidden">
                 <div className="absolute right-2 top-2 w-1.5 h-1.5 rounded-full bg-rose-500" />
-                <span className="text-[10px] text-rose-400 font-semibold block">QA Rejected</span>
+                <span className="text-[10px] text-rose-400 font-semibold block">Tasks Rejected</span>
                 <h3 className="text-lg font-bold text-rose-400 mt-0.5 font-mono">{rejectedCount}</h3>
                 <span className="text-[9px] text-rose-600/80 block mt-0.5">{rejectedPct.toFixed(1)}% Ratio</span>
               </div>
