@@ -4,6 +4,39 @@ Trainlyft AI is a premium, high-density, multi-tenant data annotation and machin
 
 ---
 
+## 🏎️ Local Quickstart Guide
+
+### Prerequisite Services
+Ensure PostgreSQL, MongoDB, and Redis are running locally or use Docker.
+
+### 1. Backend Setup
+1. Navigate to the backend directory and set up a virtual environment:
+   ```bash
+   cd backend
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   ```
+2. Configure your environment variables in `.env`.
+3. Launch the API server:
+   ```bash
+   uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+   ```
+
+### 2. Frontend Setup
+1. Navigate to the frontend directory and install dependencies:
+   ```bash
+   cd ../frontend
+   npm install
+   ```
+2. Start the development server:
+   ```bash
+   npm run dev
+   ```
+3. Open `http://localhost:3000` to access the application.
+
+---
+
 ## 🛠️ Technology Stack & Languages
 
 The platform is designed around a modern polyglot architecture combining relational databases, document stores, and in-memory caches.
@@ -65,39 +98,6 @@ The platform is designed around a modern polyglot architecture combining relatio
 │   └── terraform/            # Multi-AZ AWS provisioning scripts
 └── docker-compose.yml        # Local quickstart configuration
 ```
-
----
-
-## 🏎️ Local Quickstart Guide
-
-### Prerequisite Services
-Ensure PostgreSQL, MongoDB, and Redis are running locally or use Docker.
-
-### 1. Backend Setup
-1. Navigate to the backend directory and set up a virtual environment:
-   ```bash
-   cd backend
-   python3 -m venv venv
-   source venv/bin/activate
-   pip install -r requirements.txt
-   ```
-2. Configure your environment variables in `.env`.
-3. Launch the API server:
-   ```bash
-   uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
-   ```
-
-### 2. Frontend Setup
-1. Navigate to the frontend directory and install dependencies:
-   ```bash
-   cd ../frontend
-   npm install
-   ```
-2. Start the development server:
-   ```bash
-   npm run dev
-   ```
-3. Open `http://localhost:3000` to access the application.
 
 ---
 
