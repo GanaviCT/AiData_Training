@@ -59,6 +59,9 @@ The platform is designed around a modern polyglot architecture combining relatio
   * **PostgreSQL:** Primary storage for users, tasks, annotations, and QA reviews (SQLAlchemy ORM).
   * **MongoDB:** Polyglot document store for compliance and system audit logs.
   * **Redis:** High-speed cache for statistics and dashboard charts with automatic in-memory dict fallbacks.
+* **Background Tasks & Email System:**
+  * **Asynchronous Message Queue:** Handles background job processing (powered by Redis with a local in-memory fallback queue) for tasks such as ML model training, database updates, and email dispatch.
+  * **SMTP Email Engine:** Structured notification system using standard SMTP libraries to deliver transactional emails (e.g. system welcome emails, database backup success/failure reports, QA auditor updates, and MFA setup verifications).
 * **Security & Governance:**
   * Transparent AES-256 database encryption at rest (relational fields).
   * Multi-Factor Authentication (pyotp / TOTP MFA).
@@ -102,6 +105,7 @@ The platform is designed around a modern polyglot architecture combining relatio
 ---
 
 ## 🔒 Enterprise Features Included
+* **Automated Email Notifications**: Dynamic SMTP email dispatcher sending welcome letters, backup summaries, system logs, and security alerts.
 * **Agreement Diagnostics (Fleiss' Kappa)**: Measure the categorical consensus rate among multi-worker annotations.
 * **Audit Trail**: Real-time logging of administrative events and annotation modifications to MongoDB document store.
 * **Automatic Backup / Recovery**: One-click download of daily server archives.
