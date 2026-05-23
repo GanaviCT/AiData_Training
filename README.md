@@ -10,7 +10,7 @@ The platform is designed around a modern polyglot architecture combining relatio
 
 ### 💻 Frontend
 * **Language:** TypeScript (63.7%)
-* **Framework:** React 19 + Vite (Build System)
+* **Framework:** React 18 + Vite (Build System)
 * **State Management:** Redux Toolkit (Slices for auth, tasks, annotations)
 * **Styling:** Tailwind CSS + Vanilla CSS (Custom Glassmorphism design system supporting Light & Dark modes)
 * **Key Integrations:** 
