@@ -82,6 +82,13 @@ interface LeaderboardEntry {
   ppu_earnings: number;
 }
 
+interface WorkloadItem {
+  username: string;
+  completed: number;
+  active: number;
+  accuracy?: number;
+}
+
 const SystemMonitor: React.FC = () => {
   const { token } = useSelector((state: RootState) => state.auth);
 
@@ -299,11 +306,12 @@ const SystemMonitor: React.FC = () => {
   }).length : 0;
 
   // Workload calculations with defensive array verification
-  const workloadMap: { [username: string]: { completed: number; active: number; accuracy?: number } } = {};
+  const workloadMap: { [username: string]: WorkloadItem } = {};
   if (Array.isArray(leaderboard)) {
     leaderboard.forEach(entry => {
       if (entry && entry.username) {
         workloadMap[entry.username] = {
+          username: entry.username,
           completed: entry.tasks_completed || 0,
           active: 0,
           accuracy: entry.accuracy_rating
@@ -317,7 +325,7 @@ const SystemMonitor: React.FC = () => {
       if (task && task.assigned_to && task.assigned_to.username) {
         const username = task.assigned_to.username;
         if (!workloadMap[username]) {
-          workloadMap[username] = { completed: 0, active: 0 };
+          workloadMap[username] = { username, completed: 0, active: 0 };
         }
         if (task.status === 'pending' || task.status === 'in-progress') {
           workloadMap[username].active += 1;
@@ -802,7 +810,7 @@ const SystemMonitor: React.FC = () => {
                   </div>
                   <div className="p-4 bg-slate-950/40 border border-slate-850 rounded-2xl space-y-1">
                     <span className="text-[10px] text-slate-500 uppercase font-semibold">Failed Jobs</span>
-                    <div className="text-xl font-black text-rose-400">{queue?.total_failed}</div>
+                    <div className="text-xl font-black text-rose-450">{queue?.total_failed}</div>
                   </div>
                 </div>
 
