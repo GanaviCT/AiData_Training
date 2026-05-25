@@ -17,14 +17,11 @@ import {
   XCircle,
   HelpCircle,
   Users,
-  CheckSquare,
   FileText,
-  PieChart,
   AlertCircle,
   ShieldCheck,
   BarChart3,
-  TrendingUp,
-  UserCheck
+  TrendingUp
 } from 'lucide-react';
 
 interface ServiceDetail {
@@ -185,7 +182,7 @@ const SystemMonitor: React.FC = () => {
     }
 
     const hasWarning = Object.values(services).some(
-      (s: any) => s.status === 'degraded' || s.status === 'uncalibrated' || s.status === 'offline' || s.status === 'unhealthy'
+      (s: any) => s && (s.status === 'degraded' || s.status === 'uncalibrated' || s.status === 'offline' || s.status === 'unhealthy')
     );
     if (hasWarning) {
       return 'Warning';
@@ -257,7 +254,7 @@ const SystemMonitor: React.FC = () => {
     return (
       <div className="p-8 text-center text-slate-400 flex flex-col items-center justify-center min-h-[400px]">
         {error ? (
-          <div className="p-6 border border-rose-500/20 bg-rose-500/5 rounded-3xl text-rose-300 text-sm max-w-md text-center space-y-4">
+          <div className="p-6 border border-rose-500/20 bg-rose-500/5 rounded-3xl text-rose-350 text-sm max-w-md text-center space-y-4">
             <XCircle className="w-10 h-10 text-rose-450 mx-auto" />
             <h3 className="font-bold text-white text-base">System Telemetry Connection Issue</h3>
             <p className="text-xs text-slate-400">{error}. Please ensure the backend server is running.</p>
@@ -269,8 +266,8 @@ const SystemMonitor: React.FC = () => {
             </button>
           </div>
         ) : (
-          <div className="flex items-center justify-center">
-            <RefreshCw className="w-8 h-8 animate-spin text-cyan-400 mr-3" />
+          <div className="flex flex-col items-center justify-center space-y-2">
+            <RefreshCw className="w-8 h-8 animate-spin text-cyan-400" />
             <span className="font-semibold text-slate-300">Querying platform telemetries...</span>
           </div>
         )}
@@ -280,13 +277,13 @@ const SystemMonitor: React.FC = () => {
 
   // Calculate Business metrics with defensive array verification
   const totalTasks = Array.isArray(tasks) ? tasks.length : 0;
-  const pendingTasks = Array.isArray(tasks) ? tasks.filter(t => t.status === 'pending').length : 0;
-  const inProgressTasks = Array.isArray(tasks) ? tasks.filter(t => t.status === 'in-progress').length : 0;
-  const completedTasks = Array.isArray(tasks) ? tasks.filter(t => t.status === 'completed').length : 0;
-  const rejectedTasks = Array.isArray(tasks) ? tasks.filter(t => t.status === 'rejected').length : 0;
+  const pendingTasks = Array.isArray(tasks) ? tasks.filter(t => t && t.status === 'pending').length : 0;
+  const inProgressTasks = Array.isArray(tasks) ? tasks.filter(t => t && t.status === 'in-progress').length : 0;
+  const completedTasks = Array.isArray(tasks) ? tasks.filter(t => t && t.status === 'completed').length : 0;
+  const rejectedTasks = Array.isArray(tasks) ? tasks.filter(t => t && t.status === 'rejected').length : 0;
 
   const awaitingQATasks = Array.isArray(tasks) ? tasks.filter(t => {
-    if (t.status !== 'completed') return false;
+    if (!t || t.status !== 'completed') return false;
     if (!t.annotations || !Array.isArray(t.annotations) || t.annotations.length === 0) return true;
     const sortedAnns = [...t.annotations].sort((a, b) => b.version - a.version);
     const latest = sortedAnns[0];
@@ -294,7 +291,7 @@ const SystemMonitor: React.FC = () => {
   }).length : 0;
 
   const approvedTasks = Array.isArray(tasks) ? tasks.filter(t => {
-    if (t.status !== 'completed') return false;
+    if (!t || t.status !== 'completed') return false;
     if (!t.annotations || !Array.isArray(t.annotations) || t.annotations.length === 0) return false;
     const sortedAnns = [...t.annotations].sort((a, b) => b.version - a.version);
     const latest = sortedAnns[0];
@@ -305,17 +302,19 @@ const SystemMonitor: React.FC = () => {
   const workloadMap: { [username: string]: { completed: number; active: number; accuracy?: number } } = {};
   if (Array.isArray(leaderboard)) {
     leaderboard.forEach(entry => {
-      workloadMap[entry.username] = {
-        completed: entry.tasks_completed,
-        active: 0,
-        accuracy: entry.accuracy_rating
-      };
+      if (entry && entry.username) {
+        workloadMap[entry.username] = {
+          completed: entry.tasks_completed || 0,
+          active: 0,
+          accuracy: entry.accuracy_rating
+        };
+      }
     });
   }
 
   if (Array.isArray(tasks)) {
     tasks.forEach(task => {
-      if (task.assigned_to && task.assigned_to.username) {
+      if (task && task.assigned_to && task.assigned_to.username) {
         const username = task.assigned_to.username;
         if (!workloadMap[username]) {
           workloadMap[username] = { completed: 0, active: 0 };
@@ -332,7 +331,7 @@ const SystemMonitor: React.FC = () => {
   // DevOps circular gauge calculations
   const radius = 50;
   const circumference = 2 * Math.PI * radius;
-  const uptime = health.uptime_percentage;
+  const uptime = typeof health.uptime_percentage === 'number' ? health.uptime_percentage : 99.98;
   const strokeDashoffset = circumference - (uptime / 100) * circumference;
 
   const systemStatus = getSystemStatus();
@@ -605,9 +604,9 @@ const SystemMonitor: React.FC = () => {
                           <tr key={idx} className="hover:bg-slate-950/10 transition">
                             <td className="py-3 font-semibold text-white flex items-center gap-2">
                               <span className="w-6 h-6 rounded-full bg-gradient-to-br from-cyan-500 to-indigo-500 flex items-center justify-center text-[9px] font-bold text-white uppercase">
-                                {user.username.substring(0, 2)}
+                                {user.username ? user.username.substring(0, 2) : 'U'}
                               </span>
-                              <span>{user.username}</span>
+                              <span>{user.username || 'Unknown'}</span>
                             </td>
                             <td className="py-3 text-center">
                               <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${
@@ -624,7 +623,7 @@ const SystemMonitor: React.FC = () => {
                               {user.completed}
                             </td>
                             <td className="py-3 text-right font-mono font-bold text-emerald-400">
-                              {user.accuracy !== undefined ? `${user.accuracy.toFixed(0)}%` : '100%'}
+                              {typeof user.accuracy === 'number' ? `${user.accuracy.toFixed(0)}%` : '100%'}
                             </td>
                           </tr>
                         ))
@@ -846,7 +845,7 @@ const SystemMonitor: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-850/60">
-                      {queue && queue.history && queue.history.length > 0 ? (
+                      {queue && Array.isArray(queue.history) && queue.history.length > 0 ? (
                         [...queue.history].reverse().map((job) => (
                           <tr key={job.id} className="hover:bg-slate-950/10">
                             <td className="py-3 font-mono font-bold pr-2">{job.id}</td>
