@@ -4,15 +4,10 @@ import { RootState } from '../store';
 import { API_BASE_URL } from '../config';
 import { 
   Activity, 
-  Cpu, 
-  Layers, 
   Server, 
   RefreshCw, 
-  CheckCircle2, 
   AlertTriangle, 
-  Trash2, 
   Clock, 
-  Zap,
   CheckCircle,
   XCircle,
   HelpCircle
@@ -73,7 +68,6 @@ const SystemMonitor: React.FC = () => {
   const { token } = useSelector((state: RootState) => state.auth);
   
   const [health, setHealth] = useState<HealthResponse | null>(null);
-  const [queue, setQueue] = useState<QueueStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [refreshInterval, setRefreshInterval] = useState(3000); // 3s polling
@@ -82,22 +76,13 @@ const SystemMonitor: React.FC = () => {
   const fetchMetrics = async () => {
     setIsRefreshing(true);
     try {
-      // 1. Fetch Health Metrics
+      // Fetch Health Metrics
       const healthRes = await fetch(`${API_BASE_URL}/system/health`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!healthRes.ok) throw new Error("Failed to fetch system SLA logs");
       const healthData = await healthRes.json();
       setHealth(healthData);
-
-      // 2. Fetch Queue Stats
-      const queueRes = await fetch(`${API_BASE_URL}/admin/queue/status`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (queueRes.ok) {
-        const queueData = await queueRes.json();
-        setQueue(queueData);
-      }
       setError('');
     } catch (err: any) {
       console.error(err);
@@ -113,21 +98,6 @@ const SystemMonitor: React.FC = () => {
     const interval = setInterval(fetchMetrics, refreshInterval);
     return () => clearInterval(interval);
   }, [token, refreshInterval]);
-
-  const handleClearHistory = async () => {
-    if (!window.confirm("Are you sure you want to clear system queue histories and metrics?")) return;
-    try {
-      const res = await fetch(`${API_BASE_URL}/admin/queue/clear`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.ok) {
-        fetchMetrics();
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -332,118 +302,6 @@ const SystemMonitor: React.FC = () => {
               </div>
             </div>
           ))}
-        </div>
-      </div>
-
-      {/* Asynchronous Message Queue Monitor */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Queue stats column */}
-        <div className="space-y-6">
-          <div className="bg-slate-900/40 backdrop-blur-md border border-slate-800 rounded-3xl p-6 space-y-6">
-            <div className="flex items-center justify-between">
-              <h4 className="font-display font-bold text-sm text-white flex items-center gap-2">
-                <Layers className="w-4 h-4 text-cyan-400" />
-                Task Queue Stats
-              </h4>
-              {queue?.queue_backend && (
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-bold uppercase">
-                  {queue.queue_backend} Broker
-                </span>
-              )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-4 bg-slate-950/40 border border-slate-850 rounded-2xl space-y-1">
-                <span className="text-[10px] text-slate-500 uppercase font-semibold">Active Jobs in Queue</span>
-                <div className="text-xl font-black text-white">{queue?.queue_size}</div>
-              </div>
-              <div className="p-4 bg-slate-950/40 border border-slate-850 rounded-2xl space-y-1">
-                <span className="text-[10px] text-slate-500 uppercase font-semibold">Active Workers</span>
-                <div className="text-xl font-black text-white">{queue?.active_workers}</div>
-              </div>
-              <div className="p-4 bg-slate-950/40 border border-slate-850 rounded-2xl space-y-1">
-                <span className="text-[10px] text-slate-500 uppercase font-semibold">Jobs Completed</span>
-                <div className="text-xl font-black text-emerald-400">{queue?.total_completed}</div>
-              </div>
-              <div className="p-4 bg-slate-950/40 border border-slate-850 rounded-2xl space-y-1">
-                <span className="text-[10px] text-slate-500 uppercase font-semibold">Failed Jobs</span>
-                <div className="text-xl font-black text-rose-400">{queue?.total_failed}</div>
-              </div>
-            </div>
-
-            <div className="p-4 bg-slate-950/30 border border-slate-850 rounded-2xl flex items-center justify-between text-xs text-slate-400">
-              <div className="flex items-center gap-2">
-                <Zap className="w-4 h-4 text-amber-400" />
-                <span>Job Throughput Rate</span>
-              </div>
-              <span className="font-mono text-white font-bold">{queue?.throughput_jobs_per_sec.toFixed(3)}/sec</span>
-            </div>
-
-            <button
-              onClick={handleClearHistory}
-              className="w-full py-2.5 border border-slate-800 hover:border-rose-500/25 bg-slate-950/20 hover:bg-rose-500/5 text-slate-400 hover:text-rose-300 font-bold rounded-2xl text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              Clear Queue History
-            </button>
-          </div>
-        </div>
-
-        {/* Queue Logs History */}
-        <div className="lg:col-span-2">
-          <div className="bg-slate-900/40 backdrop-blur-md border border-slate-800 rounded-3xl p-6 space-y-4">
-            <h4 className="font-display font-bold text-sm text-white flex items-center gap-2">
-              <Activity className="w-4 h-4 text-cyan-400" />
-              Background Worker execution traces
-            </h4>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs text-left text-slate-300">
-                <thead className="text-[10px] uppercase font-bold text-slate-500 border-b border-slate-850">
-                  <tr>
-                    <th scope="col" className="pb-3 pr-2">Job ID</th>
-                    <th scope="col" className="pb-3">Type</th>
-                    <th scope="col" className="pb-3 text-center">Status</th>
-                    <th scope="col" className="pb-3 text-right">Elapsed</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-850/60">
-                  {queue && queue.history && queue.history.length > 0 ? (
-                    [...queue.history].reverse().map((job) => (
-                      <tr key={job.id} className="hover:bg-slate-950/10">
-                        <td className="py-3 font-mono font-bold pr-2">{job.id}</td>
-                        <td className="py-3 font-medium">
-                          <div>{job.type}</div>
-                          {job.error && (
-                            <div className="text-[10px] text-rose-400 mt-0.5 break-all max-w-sm">{job.error}</div>
-                          )}
-                        </td>
-                        <td className="py-3 text-center">
-                          <span className={`inline-block px-2 py-0.5 rounded text-[9px] font-bold uppercase ${
-                            job.status === 'completed' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                            job.status === 'processing' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' :
-                            job.status === 'failed' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' :
-                            'bg-slate-800 text-slate-400'
-                          }`}>
-                            {job.status}
-                          </span>
-                        </td>
-                        <td className="py-3 text-right font-mono text-slate-400">
-                          {job.completed_at ? `${(job.completed_at - job.created_at).toFixed(1)}s` : 'running'}
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={4} className="py-8 text-center text-slate-500">
-                        No background worker traces found. Queue is idle.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
         </div>
       </div>
     </div>
