@@ -8,20 +8,18 @@ import {
   Layers,
   Server,
   RefreshCw,
-  CheckCircle2,
-  AlertTriangle,
-  Trash2,
   Clock,
   Zap,
   CheckCircle,
   XCircle,
   HelpCircle,
   Users,
-  FileText,
   AlertCircle,
   ShieldCheck,
   BarChart3,
-  TrendingUp
+  TrendingUp,
+  AlertTriangle,
+  Trash2
 } from 'lucide-react';
 
 interface ServiceDetail {
@@ -96,7 +94,6 @@ const SystemMonitor: React.FC = () => {
   const [queue, setQueue] = useState<QueueStatus | null>(null);
   const [tasks, setTasks] = useState<any[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
-  const [qaStats, setQaStats] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [refreshInterval, setRefreshInterval] = useState(3000); // 3s polling
@@ -108,12 +105,11 @@ const SystemMonitor: React.FC = () => {
     try {
       const headers = { 'Authorization': `Bearer ${token}` };
 
-      const [healthRes, queueRes, tasksRes, leaderboardRes, qaRes] = await Promise.allSettled([
+      const [healthRes, queueRes, tasksRes, leaderboardRes] = await Promise.allSettled([
         fetch(`${API_BASE_URL}/system/health`, { headers }),
         fetch(`${API_BASE_URL}/admin/queue/status`, { headers }),
         fetch(`${API_BASE_URL}/tasks`, { headers }),
-        fetch(`${API_BASE_URL}/dashboard/leaderboard`, { headers }),
-        fetch(`${API_BASE_URL}/qa/stats`, { headers })
+        fetch(`${API_BASE_URL}/dashboard/leaderboard`, { headers })
       ]);
 
       if (healthRes.status === 'fulfilled' && healthRes.value.ok) {
@@ -136,11 +132,6 @@ const SystemMonitor: React.FC = () => {
       if (leaderboardRes.status === 'fulfilled' && leaderboardRes.value.ok) {
         const lbData = await leaderboardRes.value.json();
         setLeaderboard(lbData);
-      }
-
-      if (qaRes.status === 'fulfilled' && qaRes.value.ok) {
-        const qaData = await qaRes.value.json();
-        setQaStats(qaData);
       }
 
       setError('');
@@ -256,7 +247,7 @@ const SystemMonitor: React.FC = () => {
     }
   };
 
-  // Guard against null health object before rendering the core dashboard views
+  // Guard against null health object before rendering
   if (!health) {
     return (
       <div className="p-8 text-center text-slate-400 flex flex-col items-center justify-center min-h-[400px]">
@@ -282,27 +273,13 @@ const SystemMonitor: React.FC = () => {
     );
   }
 
-  // Calculate Business metrics with defensive array verification
-  const totalTasks = Array.isArray(tasks) ? tasks.length : 0;
-  const pendingTasks = Array.isArray(tasks) ? tasks.filter(t => t && t.status === 'pending').length : 0;
-  const inProgressTasks = Array.isArray(tasks) ? tasks.filter(t => t && t.status === 'in-progress').length : 0;
-  const completedTasks = Array.isArray(tasks) ? tasks.filter(t => t && t.status === 'completed').length : 0;
-  const rejectedTasks = Array.isArray(tasks) ? tasks.filter(t => t && t.status === 'rejected').length : 0;
-
+  // Calculate Awaiting QA with defensive verification
   const awaitingQATasks = Array.isArray(tasks) ? tasks.filter(t => {
     if (!t || t.status !== 'completed') return false;
     if (!t.annotations || !Array.isArray(t.annotations) || t.annotations.length === 0) return true;
     const sortedAnns = [...t.annotations].sort((a, b) => b.version - a.version);
     const latest = sortedAnns[0];
     return !latest || !latest.qa_results || latest.qa_results.length === 0;
-  }).length : 0;
-
-  const approvedTasks = Array.isArray(tasks) ? tasks.filter(t => {
-    if (!t || t.status !== 'completed') return false;
-    if (!t.annotations || !Array.isArray(t.annotations) || t.annotations.length === 0) return false;
-    const sortedAnns = [...t.annotations].sort((a, b) => b.version - a.version);
-    const latest = sortedAnns[0];
-    return latest && latest.qa_results && latest.qa_results.length > 0 && latest.qa_results[latest.qa_results.length - 1].approved;
   }).length : 0;
 
   // Workload calculations with defensive array verification
@@ -369,7 +346,7 @@ const SystemMonitor: React.FC = () => {
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              <BarChart3 className="w-3.5 h-3.5" />
+              <Activity className="w-3.5 h-3.5" />
               Operations Dashboard
             </button>
             <button
@@ -424,7 +401,7 @@ const SystemMonitor: React.FC = () => {
             {/* System Status Indicator Card */}
             <div className="bg-slate-900/40 backdrop-blur-md border border-slate-800 rounded-3xl p-6 flex flex-col justify-between min-h-[160px] relative overflow-hidden">
               <div className="space-y-2">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Platform Health</span>
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block font-semibold">Platform Health</span>
                 <div className="flex items-center gap-3 mt-2">
                   <span className={`inline-block w-4 h-4 rounded-full ${
                     systemStatus === 'Healthy'
@@ -454,7 +431,7 @@ const SystemMonitor: React.FC = () => {
             {/* Alerts Panel Section (Spans 2 columns) */}
             <div className="bg-slate-900/40 backdrop-blur-md border border-slate-800 rounded-3xl p-6 md:col-span-2 flex flex-col justify-between min-h-[160px]">
               <div>
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-2">Critical Notifications & Alerts</span>
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-2 font-semibold">Active Integration Banners</span>
                 <div className="space-y-2.5 mt-2">
                   {alertsList.length > 0 ? (
                     alertsList.map((alert, idx) => (
@@ -486,114 +463,31 @@ const SystemMonitor: React.FC = () => {
             </div>
           </div>
 
-          {/* Business Overview (Task Stats Grid) */}
-          <div className="space-y-4">
-            <h4 className="text-sm font-bold text-white flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-cyan-400" />
-              📊 Dashboard Overview
-            </h4>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-              
-              <div className="bg-slate-900/40 backdrop-blur-md border border-slate-800 rounded-3xl p-6 space-y-4 hover:border-slate-700 transition duration-300">
-                <div className="flex justify-between items-start">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Tasks</span>
-                  <div className="p-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
-                    <FileText className="w-4 h-4 text-indigo-400" />
-                  </div>
-                </div>
-                <div>
-                  <div className="text-3xl font-black text-white">{totalTasks}</div>
-                  <span className="text-[10px] text-slate-400">Annotation assets uploaded</span>
-                </div>
-              </div>
-
-              <div className="bg-slate-900/40 backdrop-blur-md border border-slate-800 rounded-3xl p-6 space-y-4 hover:border-slate-700 transition duration-300">
-                <div className="flex justify-between items-start">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Pending Tasks</span>
-                  <div className="p-2 bg-amber-500/10 border border-amber-500/20 rounded-xl">
-                    <Clock className="w-4 h-4 text-amber-400" />
-                  </div>
-                </div>
-                <div>
-                  <div className="text-3xl font-black text-white">{pendingTasks}</div>
-                  <span className="text-[10px] text-slate-400">Awaiting user assignment</span>
-                </div>
-              </div>
-
-              <div className="bg-slate-900/40 backdrop-blur-md border border-slate-800 rounded-3xl p-6 space-y-4 hover:border-slate-700 transition duration-300">
-                <div className="flex justify-between items-start">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">In Progress</span>
-                  <div className="p-2 bg-cyan-500/10 border border-cyan-500/20 rounded-xl">
-                    <Activity className="w-4 h-4 text-cyan-400" />
-                  </div>
-                </div>
-                <div>
-                  <div className="text-3xl font-black text-white">{inProgressTasks}</div>
-                  <span className="text-[10px] text-slate-400">Currently being annotated</span>
-                </div>
-              </div>
-
-              <div className="bg-slate-900/40 backdrop-blur-md border border-slate-800 rounded-3xl p-6 space-y-4 hover:border-slate-700 transition duration-300">
-                <div className="flex justify-between items-start">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Completed</span>
-                  <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  </div>
-                </div>
-                <div>
-                  <div className="text-3xl font-black text-white">{completedTasks}</div>
-                  <span className="text-[10px] text-slate-400">Annotations submitted</span>
-                </div>
-              </div>
-
-            </div>
-          </div>
-
-          {/* QA Status & Team Workload (2-column layout) */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* QA Status & Team Pending Workload Layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             
-            {/* QA Status Grid */}
+            {/* Live Pipeline QA Card */}
             <div className="space-y-4">
               <h4 className="text-sm font-bold text-white flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-cyan-400" />
-                🧪 QA Status
+                🧪 Pipeline QA Queue
               </h4>
-              <div className="bg-slate-900/40 backdrop-blur-md border border-slate-800 rounded-3xl p-6 space-y-6">
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="bg-slate-950/40 border border-slate-850 p-4 rounded-2xl flex flex-col justify-between space-y-2">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase">Awaiting QA</span>
-                    <div className="text-2xl font-black text-cyan-400">{awaitingQATasks}</div>
-                  </div>
-                  <div className="bg-slate-950/40 border border-slate-850 p-4 rounded-2xl flex flex-col justify-between space-y-2">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase">Approved</span>
-                    <div className="text-2xl font-black text-emerald-400">{approvedTasks}</div>
-                  </div>
-                  <div className="bg-slate-950/40 border border-slate-850 p-4 rounded-2xl flex flex-col justify-between space-y-2">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase">Rejected</span>
-                    <div className="text-2xl font-black text-rose-450">{rejectedTasks}</div>
-                  </div>
+              <div className="bg-slate-900/40 backdrop-blur-md border border-slate-800 rounded-3xl p-6 flex flex-col justify-between min-h-[220px]">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Awaiting Quality Assurance</span>
+                  <div className="text-5xl font-black text-cyan-400 mt-4 font-display">{awaitingQATasks}</div>
+                  <p className="text-xs text-slate-400 mt-3 leading-relaxed">
+                    Tasks annotated by workers that require administrator review before being finalized.
+                  </p>
                 </div>
-                
-                {/* Accuracy percentage tracker */}
-                {qaStats && (
-                  <div className="p-4 bg-slate-950/20 border border-slate-850 rounded-2xl flex items-center justify-between text-xs">
-                    <span className="text-slate-400 font-semibold flex items-center gap-2">
-                      <TrendingUp className="w-4 h-4 text-indigo-400" />
-                      Global Annotation Accuracy
-                    </span>
-                    <span className="font-mono text-white font-black text-sm bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded">
-                      {qaStats.accuracy_percentage ? qaStats.accuracy_percentage.toFixed(1) : '0.0'}%
-                    </span>
-                  </div>
-                )}
               </div>
             </div>
 
-            {/* Team Workload Section */}
-            <div className="space-y-4">
+            {/* Team Pending Workload Table (Spans 2 columns) */}
+            <div className="lg:col-span-2 space-y-4">
               <h4 className="text-sm font-bold text-white flex items-center gap-2">
                 <Users className="w-4 h-4 text-cyan-400" />
-                👥 Team Workload
+                👥 Team Workload (Pending Pipelines)
               </h4>
               <div className="bg-slate-900/40 backdrop-blur-md border border-slate-800 rounded-3xl p-6 overflow-hidden">
                 <div className="overflow-x-auto">
@@ -602,8 +496,8 @@ const SystemMonitor: React.FC = () => {
                       <tr>
                         <th className="pb-3 text-left">Annotator</th>
                         <th className="pb-3 text-center">Active Workload</th>
-                        <th className="pb-3 text-center">Completed</th>
-                        <th className="pb-3 text-right">Accuracy</th>
+                        <th className="pb-3 text-center">Completed Tasks</th>
+                        <th className="pb-3 text-right">Accuracy Rating</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-850/60">
@@ -638,7 +532,7 @@ const SystemMonitor: React.FC = () => {
                       ) : (
                         <tr>
                           <td colSpan={4} className="py-8 text-center text-slate-500">
-                            No team workload metrics available.
+                            No active pending user workloads found.
                           </td>
                         </tr>
                       )}
