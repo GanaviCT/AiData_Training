@@ -16,10 +16,11 @@ import {
   Users,
   AlertCircle,
   ShieldCheck,
-  BarChart3,
   TrendingUp,
   AlertTriangle,
-  Trash2
+  Trash2,
+  ChevronRight,
+  UserCheck
 } from 'lucide-react';
 
 interface ServiceDetail {
@@ -196,22 +197,22 @@ const SystemMonitor: React.FC = () => {
     const services = health.services;
 
     if (services.redis?.status === 'unhealthy') {
-      alertsList.push({ text: 'Redis disconnected ❌', type: 'error' });
+      alertsList.push({ text: 'Redis disconnected', type: 'error' });
     }
     if (services.smtp?.status !== 'healthy') {
-      alertsList.push({ text: 'Email service delayed ⚠️', type: 'warning' });
+      alertsList.push({ text: 'Email service delayed', type: 'warning' });
     }
     if (services.postgresql?.status === 'unhealthy') {
-      alertsList.push({ text: 'PostgreSQL database offline ❌', type: 'error' });
+      alertsList.push({ text: 'PostgreSQL database offline', type: 'error' });
     }
     if (services.mongodb?.status === 'unhealthy') {
-      alertsList.push({ text: 'MongoDB database offline ❌', type: 'error' });
+      alertsList.push({ text: 'MongoDB database offline', type: 'error' });
     }
     if (services.ml_engine?.status === 'uncalibrated') {
-      alertsList.push({ text: 'ML Engine calibration required ⚠️', type: 'warning' });
+      alertsList.push({ text: 'ML Engine calibration required', type: 'warning' });
     }
     if (services.message_queue?.status === 'degraded') {
-      alertsList.push({ text: 'Queue processing delay detected ⚠️', type: 'warning' });
+      alertsList.push({ text: 'Queue processing delay detected', type: 'warning' });
     }
 
     return alertsList;
@@ -220,13 +221,13 @@ const SystemMonitor: React.FC = () => {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'healthy':
-        return <CheckCircle className="w-5 h-5 text-emerald-400" />;
+        return <CheckCircle className="w-5 h-5 text-emerald-400 animate-pulse" />;
       case 'uncalibrated':
       case 'degraded':
-        return <AlertTriangle className="w-5 h-5 text-amber-400" />;
+        return <AlertTriangle className="w-5 h-5 text-amber-400 animate-pulse" />;
       case 'unhealthy':
       case 'offline':
-        return <XCircle className="w-5 h-5 text-rose-400" />;
+        return <XCircle className="w-5 h-5 text-rose-400 animate-pulse" />;
       default:
         return <HelpCircle className="w-5 h-5 text-slate-400" />;
     }
@@ -235,13 +236,13 @@ const SystemMonitor: React.FC = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'healthy':
-        return 'border-emerald-500/20 bg-emerald-500/5 text-emerald-300';
+        return 'border-emerald-500/20 bg-emerald-500/5 text-emerald-350 dark:text-emerald-300';
       case 'uncalibrated':
       case 'degraded':
-        return 'border-amber-500/20 bg-amber-500/5 text-amber-300';
+        return 'border-amber-500/20 bg-amber-500/5 text-amber-350 dark:text-amber-300';
       case 'unhealthy':
       case 'offline':
-        return 'border-rose-500/20 bg-rose-500/5 text-rose-300';
+        return 'border-rose-500/20 bg-rose-500/5 text-rose-350 dark:text-rose-300';
       default:
         return 'border-slate-800 bg-slate-900/40 text-slate-400';
     }
@@ -252,28 +253,31 @@ const SystemMonitor: React.FC = () => {
     return (
       <div className="p-8 text-center text-slate-400 flex flex-col items-center justify-center min-h-[400px]">
         {error ? (
-          <div className="p-6 border border-rose-500/20 bg-rose-500/5 rounded-3xl text-rose-350 text-sm max-w-md text-center space-y-4">
-            <XCircle className="w-10 h-10 text-rose-450 mx-auto" />
+          <div className="p-8 border border-rose-500/20 bg-rose-500/5 rounded-3xl text-rose-300 text-sm max-w-md text-center space-y-4 shadow-2xl">
+            <XCircle className="w-12 h-12 text-rose-500 mx-auto animate-bounce" />
             <h3 className="font-bold text-white text-base">System Telemetry Connection Issue</h3>
             <p className="text-xs text-slate-400">{error}. Please ensure the backend server is running.</p>
             <button
               onClick={fetchMetrics}
-              className="px-4 py-2 bg-slate-900 hover:bg-slate-850 border border-slate-800 rounded-xl text-xs font-bold text-white transition cursor-pointer"
+              className="px-5 py-2.5 bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-400 hover:to-pink-400 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-rose-500/20 cursor-pointer"
             >
               Retry Connection
             </button>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center space-y-2">
-            <RefreshCw className="w-8 h-8 animate-spin text-cyan-400" />
-            <span className="font-semibold text-slate-300">Querying platform telemetries...</span>
+          <div className="flex flex-col items-center justify-center space-y-3">
+            <RefreshCw className="w-10 h-10 animate-spin text-cyan-400" />
+            <span className="font-semibold text-slate-300 tracking-wide">Querying platform telemetries...</span>
           </div>
         )}
       </div>
     );
   }
 
-  // Calculate Awaiting QA with defensive verification
+  // Calculate stats
+  const totalTasks = Array.isArray(tasks) ? tasks.length : 0;
+  const completedTasks = Array.isArray(tasks) ? tasks.filter(t => t && t.status === 'completed').length : 0;
+
   const awaitingQATasks = Array.isArray(tasks) ? tasks.filter(t => {
     if (!t || t.status !== 'completed') return false;
     if (!t.annotations || !Array.isArray(t.annotations) || t.annotations.length === 0) return true;
@@ -313,6 +317,11 @@ const SystemMonitor: React.FC = () => {
 
   const workloads = Object.values(workloadMap).sort((a, b) => b.active - a.active);
 
+  // Circular progress for QA queue
+  const qaCircumference = 2 * Math.PI * 40; // radius = 40
+  const qaPercentage = completedTasks > 0 ? (awaitingQATasks / completedTasks) * 100 : 0;
+  const qaDashoffset = qaCircumference - (qaPercentage / 100) * qaCircumference;
+
   // DevOps circular gauge calculations
   const radius = 50;
   const circumference = 2 * Math.PI * radius;
@@ -321,6 +330,12 @@ const SystemMonitor: React.FC = () => {
 
   const systemStatus = getSystemStatus();
   const alertsList = getAlerts();
+
+  // Navigate to QA Tool helper using deep linking
+  const handleOpenQATool = () => {
+    // Triggers direct deep-linking in App.tsx via query parameters
+    window.location.search = '?page=qa';
+  };
 
   return (
     <div className="p-8 space-y-8">
@@ -337,12 +352,12 @@ const SystemMonitor: React.FC = () => {
 
         {/* Tab Controls */}
         <div className="flex items-center gap-4">
-          <div className="bg-slate-950/80 p-1 border border-slate-850 rounded-2xl flex">
+          <div className="bg-slate-950/80 p-1 border border-slate-850 rounded-2xl flex shadow-inner">
             <button
               onClick={() => setActiveTab('operations')}
-              className={`px-4 py-2 text-xs font-bold rounded-xl transition-all duration-300 flex items-center gap-2 cursor-pointer ${
+              className={`px-4 py-2.5 text-xs font-bold rounded-xl transition-all duration-300 flex items-center gap-2 cursor-pointer ${
                 activeTab === 'operations'
-                  ? 'bg-gradient-to-r from-cyan-500 to-indigo-500 text-white shadow-lg'
+                  ? 'bg-gradient-to-r from-cyan-500 to-indigo-500 text-white shadow-lg shadow-indigo-500/10'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
@@ -351,9 +366,9 @@ const SystemMonitor: React.FC = () => {
             </button>
             <button
               onClick={() => setActiveTab('devops')}
-              className={`px-4 py-2 text-xs font-bold rounded-xl transition-all duration-300 flex items-center gap-2 cursor-pointer ${
+              className={`px-4 py-2.5 text-xs font-bold rounded-xl transition-all duration-300 flex items-center gap-2 cursor-pointer ${
                 activeTab === 'devops'
-                  ? 'bg-gradient-to-r from-cyan-500 to-indigo-500 text-white shadow-lg'
+                  ? 'bg-gradient-to-r from-cyan-500 to-indigo-500 text-white shadow-lg shadow-indigo-500/10'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
@@ -366,7 +381,7 @@ const SystemMonitor: React.FC = () => {
             <select
               value={refreshInterval}
               onChange={(e) => setRefreshInterval(Number(e.target.value))}
-              className="bg-slate-950/60 border border-slate-855 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none"
+              className="bg-slate-950/60 border border-slate-855 rounded-xl px-3 py-2.5 text-xs text-slate-300 focus:outline-none cursor-pointer"
             >
               <option value="2000">Refresh: 2s</option>
               <option value="3000">Refresh: 3s</option>
@@ -376,7 +391,7 @@ const SystemMonitor: React.FC = () => {
             <button
               onClick={fetchMetrics}
               disabled={isRefreshing}
-              className="p-2.5 bg-slate-900/40 hover:bg-slate-850/60 border border-slate-800 rounded-xl transition text-slate-400 hover:text-white"
+              className="p-2.5 bg-slate-900/40 hover:bg-slate-850/60 border border-slate-800 rounded-xl transition text-slate-400 hover:text-white cursor-pointer"
             >
               <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-cyan-400' : ''}`} />
             </button>
@@ -386,7 +401,7 @@ const SystemMonitor: React.FC = () => {
 
       {error && (
         <div className="p-4 border border-rose-500/20 bg-rose-500/5 rounded-2xl flex items-center gap-3 text-rose-300 text-sm">
-          <XCircle className="w-5 h-5 flex-shrink-0" />
+          <XCircle className="w-5 h-5 flex-shrink-0 text-rose-500" />
           <span>{error}. Check backend server status.</span>
         </div>
       )}
@@ -396,21 +411,34 @@ const SystemMonitor: React.FC = () => {
         <div className="space-y-8 animate-fadeIn">
           
           {/* High-Level System Status & Alerts Section */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
             {/* System Status Indicator Card */}
-            <div className="bg-slate-900/40 backdrop-blur-md border border-slate-800 rounded-3xl p-6 flex flex-col justify-between min-h-[160px] relative overflow-hidden">
-              <div className="space-y-2">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block font-semibold">Platform Health</span>
-                <div className="flex items-center gap-3 mt-2">
+            <div className={`backdrop-blur-xl border rounded-3xl p-6 flex flex-col justify-between min-h-[170px] relative overflow-hidden shadow-xl transition-all duration-300 ${
+              systemStatus === 'Healthy'
+                ? 'bg-gradient-to-br from-emerald-500/10 via-emerald-500/2 to-transparent border-emerald-500/25 shadow-emerald-500/5'
+                : systemStatus === 'Warning'
+                ? 'bg-gradient-to-br from-amber-500/10 via-amber-500/2 to-transparent border-amber-500/25 shadow-amber-500/5'
+                : 'bg-gradient-to-br from-rose-500/10 via-rose-500/2 to-transparent border-rose-500/25 shadow-rose-500/5'
+            }`}>
+              {/* Floating Large Glowing Icon in Background */}
+              <div className="absolute -right-8 -top-8 opacity-[0.08] dark:opacity-[0.05]">
+                {systemStatus === 'Healthy' && <ShieldCheck className="w-32 h-32 text-emerald-400" />}
+                {systemStatus === 'Warning' && <AlertTriangle className="w-32 h-32 text-amber-400" />}
+                {systemStatus === 'Down' && <XCircle className="w-32 h-32 text-rose-400" />}
+              </div>
+
+              <div className="space-y-2 relative z-10">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block font-display">System Integrity</span>
+                <div className="flex items-center gap-3.5 mt-2">
                   <span className={`inline-block w-4 h-4 rounded-full ${
                     systemStatus === 'Healthy'
-                      ? 'bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.6)] animate-pulse'
+                      ? 'bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.75)] animate-pulse'
                       : systemStatus === 'Warning'
-                      ? 'bg-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.6)] animate-pulse'
-                      : 'bg-rose-500 shadow-[0_0_12px_rgba(239,68,68,0.6)] animate-pulse'
+                      ? 'bg-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.75)] animate-pulse'
+                      : 'bg-rose-500 shadow-[0_0_12px_rgba(239,68,68,0.75)] animate-pulse'
                   }`} />
-                  <span className={`text-2xl font-black ${
+                  <span className={`text-2xl font-display font-black tracking-tight ${
                     systemStatus === 'Healthy'
                       ? 'text-emerald-400'
                       : systemStatus === 'Warning'
@@ -421,41 +449,56 @@ const SystemMonitor: React.FC = () => {
                   </span>
                 </div>
               </div>
-              <p className="text-xs text-slate-400 mt-4">
-                {systemStatus === 'Healthy' && "All integrations and services are operating normally."}
-                {systemStatus === 'Warning' && "Partial outage or configuration delay detected. See warnings."}
-                {systemStatus === 'Down' && "Platform critical services are experiencing disruptions."}
-              </p>
+
+              <div className="mt-4 space-y-2 relative z-10">
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  {systemStatus === 'Healthy' && "All integration pipelines and endpoints are operating at peak efficiency."}
+                  {systemStatus === 'Warning' && "Partial network latency or offline mail relay detected. System degraded."}
+                  {systemStatus === 'Down' && "Critical platform databases are experiencing outages. Actions required."}
+                </p>
+                <div className="flex items-center gap-4 text-[10px] text-slate-500 font-bold uppercase tracking-wider pt-2 border-t border-slate-800/10 dark:border-slate-800/40">
+                  <span>SLA Uptime: <strong className="text-white font-black">{uptime.toFixed(2)}%</strong></span>
+                  <span>Compliance: <strong className={uptime >= 99.5 ? 'text-emerald-400' : 'text-rose-400'}>{health.sla_status}</strong></span>
+                </div>
+              </div>
             </div>
 
             {/* Alerts Panel Section (Spans 2 columns) */}
-            <div className="bg-slate-900/40 backdrop-blur-md border border-slate-800 rounded-3xl p-6 md:col-span-2 flex flex-col justify-between min-h-[160px]">
-              <div>
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-2 font-semibold">Active Integration Banners</span>
-                <div className="space-y-2.5 mt-2">
+            <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/80 rounded-3xl p-6 lg:col-span-2 flex flex-col justify-between min-h-[170px] shadow-xl relative overflow-hidden">
+              <div className="absolute -top-12 -right-12 w-24 h-24 bg-cyan-500/5 rounded-full blur-2xl" />
+              <div className="w-full">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block font-display mb-3">ACTIVE INTEGRATION BANNERS</span>
+                <div className="space-y-3 mt-1 max-h-[120px] overflow-y-auto pr-1">
                   {alertsList.length > 0 ? (
                     alertsList.map((alert, idx) => (
                       <div
                         key={idx}
-                        className={`px-4 py-2 border rounded-xl flex items-center justify-between text-xs font-semibold ${
+                        className={`pl-3 pr-4 py-2.5 border-l-4 rounded-r-xl flex items-center justify-between text-xs font-semibold shadow-sm transition duration-300 ${
                           alert.type === 'error'
-                            ? 'border-rose-500/25 bg-rose-500/5 text-rose-350'
-                            : 'border-amber-500/25 bg-amber-500/5 text-amber-350'
+                            ? 'border-l-rose-500 border-rose-500/25 bg-rose-500/5 text-rose-350 dark:text-rose-300 hover:bg-rose-500/10'
+                            : 'border-l-amber-500 border-amber-500/25 bg-amber-500/5 text-amber-350 dark:text-amber-300 hover:bg-amber-500/10'
                         }`}
                       >
                         <span className="flex items-center gap-2">
-                          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                          <AlertCircle className={`w-4 h-4 flex-shrink-0 ${alert.type === 'error' ? 'text-rose-400' : 'text-amber-400'}`} />
                           {alert.text}
                         </span>
-                        <span className="text-[10px] uppercase opacity-70 font-bold">
+                        <span className={`text-[9px] uppercase font-black px-2 py-0.5 rounded ${
+                          alert.type === 'error' ? 'bg-rose-500/10 text-rose-400' : 'bg-amber-500/10 text-amber-400'
+                        }`}>
                           {alert.type === 'error' ? 'Critical' : 'Warning'}
                         </span>
                       </div>
                     ))
                   ) : (
-                    <div className="px-4 py-3 border border-emerald-500/20 bg-emerald-500/5 text-emerald-300 rounded-2xl flex items-center gap-2.5 text-xs font-medium">
-                      <ShieldCheck className="w-5 h-5 text-emerald-400 flex-shrink-0" />
-                      <span>All core systems operational. No critical business alerts detected.</span>
+                    <div className="px-5 py-4 border border-emerald-500/20 bg-emerald-500/5 text-emerald-350 dark:text-emerald-350 rounded-2xl flex items-center gap-3 text-xs font-medium shadow-inner">
+                      <div className="p-1 bg-emerald-500/10 rounded-lg">
+                        <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                      </div>
+                      <div>
+                        <span className="font-bold text-white block text-sm">All Integrations Operational</span>
+                        <span className="text-[10px] text-slate-400 block mt-0.5">No critical warnings or active outages currently reported.</span>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -467,68 +510,128 @@ const SystemMonitor: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             
             {/* Live Pipeline QA Card */}
-            <div className="space-y-4">
-              <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-cyan-400" />
-                🧪 Pipeline QA Queue
-              </h4>
-              <div className="bg-slate-900/40 backdrop-blur-md border border-slate-800 rounded-3xl p-6 flex flex-col justify-between min-h-[220px]">
-                <div>
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Awaiting Quality Assurance</span>
-                  <div className="text-5xl font-black text-cyan-400 mt-4 font-display">{awaitingQATasks}</div>
-                  <p className="text-xs text-slate-400 mt-3 leading-relaxed">
-                    Tasks annotated by workers that require administrator review before being finalized.
-                  </p>
+            <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/80 rounded-3xl p-6 flex flex-col justify-between min-h-[260px] shadow-xl relative overflow-hidden group hover:border-slate-700 transition duration-300">
+              <div className="absolute -bottom-16 -left-16 w-32 h-32 bg-cyan-500/5 rounded-full blur-3xl" />
+              <div>
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block font-display">Pipeline Queue</span>
+                
+                <div className="flex items-center justify-between mt-6">
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-200">Awaiting QA Review</h3>
+                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed max-w-[130px]">
+                      Annotated tasks ready for admin auditing.
+                    </p>
+                  </div>
+
+                  {/* High-tech circular progress chart */}
+                  <div className="relative w-20 h-20 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-full h-full transform -rotate-95">
+                      <circle
+                        cx="40"
+                        cy="40"
+                        r="32"
+                        className="stroke-slate-850"
+                        strokeWidth="5"
+                        fill="transparent"
+                      />
+                      <circle
+                        cx="40"
+                        cy="40"
+                        r="32"
+                        className="stroke-cyan-500"
+                        strokeWidth="5"
+                        fill="transparent"
+                        strokeDasharray={qaCircumference}
+                        strokeDashoffset={qaDashoffset}
+                        strokeLinecap="round"
+                        style={{ transition: 'stroke-dashoffset 0.8s ease' }}
+                      />
+                    </svg>
+                    <div className="absolute text-center">
+                      <span className="text-xl font-display font-black text-white">{awaitingQATasks}</span>
+                    </div>
+                  </div>
                 </div>
+              </div>
+
+              <div className="pt-4 border-t border-slate-850">
+                <button
+                  onClick={handleOpenQATool}
+                  className="w-full py-2.5 bg-gradient-to-r from-cyan-500 to-indigo-500 hover:from-cyan-400 hover:to-indigo-400 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-lg shadow-cyan-500/10 hover:shadow-cyan-500/20 transition-all duration-300 cursor-pointer"
+                >
+                  Open QA Review Tool
+                  <ChevronRight className="w-4 h-4" />
+                </button>
               </div>
             </div>
 
             {/* Team Pending Workload Table (Spans 2 columns) */}
             <div className="lg:col-span-2 space-y-4">
-              <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                <Users className="w-4 h-4 text-cyan-400" />
-                👥 Team Workload (Pending Pipelines)
-              </h4>
-              <div className="bg-slate-900/40 backdrop-blur-md border border-slate-800 rounded-3xl p-6 overflow-hidden">
+              <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/80 rounded-3xl p-6 shadow-xl relative overflow-hidden">
+                <div className="absolute -top-12 -right-12 w-24 h-24 bg-indigo-500/5 rounded-full blur-2xl" />
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block font-display">HUMAN WORKFLOW PIPELINES</span>
+                    <h3 className="text-sm font-semibold text-slate-200 mt-1">Annotator Queue Workloads</h3>
+                  </div>
+                </div>
+
                 <div className="overflow-x-auto">
-                  <table className="w-full text-xs text-left text-slate-300">
-                    <thead className="text-[10px] uppercase font-bold text-slate-500 border-b border-slate-850">
+                  <table className="w-full text-xs text-left text-slate-350">
+                    <thead className="text-[10px] uppercase font-black text-slate-500 border-b border-slate-850">
                       <tr>
-                        <th className="pb-3 text-left">Annotator</th>
-                        <th className="pb-3 text-center">Active Workload</th>
-                        <th className="pb-3 text-center">Completed Tasks</th>
-                        <th className="pb-3 text-right">Accuracy Rating</th>
+                        <th className="pb-3 text-left pl-2">Annotator</th>
+                        <th className="pb-3 text-center">Load Status</th>
+                        <th className="pb-3 text-center">Task Completion</th>
+                        <th className="pb-3 text-right pr-2">Expert Accuracy</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-850/60">
+                    <tbody className="divide-y divide-slate-850/50">
                       {workloads.length > 0 ? (
-                        workloads.map((user, idx) => (
-                          <tr key={idx} className="hover:bg-slate-950/10 transition">
-                            <td className="py-3 font-semibold text-white flex items-center gap-2">
-                              <span className="w-6 h-6 rounded-full bg-gradient-to-br from-cyan-500 to-indigo-500 flex items-center justify-center text-[9px] font-bold text-white uppercase">
-                                {user.username ? user.username.substring(0, 2) : 'U'}
-                              </span>
-                              <span>{user.username || 'Unknown'}</span>
-                            </td>
-                            <td className="py-3 text-center">
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${
-                                user.active > 5
-                                  ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                                  : user.active > 0
-                                  ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                                  : 'bg-slate-800/40 text-slate-400'
-                              }`}>
-                                {user.active} tasks
-                              </span>
-                            </td>
-                            <td className="py-3 text-center font-mono font-medium">
-                              {user.completed}
-                            </td>
-                            <td className="py-3 text-right font-mono font-bold text-emerald-400">
-                              {typeof user.accuracy === 'number' ? `${user.accuracy.toFixed(0)}%` : '100%'}
-                            </td>
-                          </tr>
-                        ))
+                        workloads.map((user, idx) => {
+                          const totalUserTasks = user.completed + user.active;
+                          const completionRatio = totalUserTasks > 0 ? (user.completed / totalUserTasks) * 100 : 100;
+                          
+                          return (
+                            <tr key={idx} className="hover:bg-slate-950/10 dark:hover:bg-slate-950/30 transition-all duration-150 group">
+                              <td className="py-3.5 pl-2 font-semibold text-white flex items-center gap-3">
+                                <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-cyan-500 to-indigo-500 flex items-center justify-center text-[10px] font-black text-white uppercase shadow-md shadow-cyan-500/5 group-hover:scale-105 transition duration-300">
+                                  {user.username ? user.username.substring(0, 2) : 'U'}
+                                </span>
+                                <span className="truncate max-w-[120px]" title={user.username}>{user.username || 'Unknown'}</span>
+                              </td>
+                              <td className="py-3.5 text-center">
+                                <span className={`px-2.5 py-1 rounded-xl text-[9px] font-black uppercase tracking-wider ${
+                                  user.active > 5
+                                    ? 'bg-rose-500/10 text-rose-450 border border-rose-500/20'
+                                    : user.active > 0
+                                    ? 'bg-amber-500/10 text-amber-450 border border-amber-500/20'
+                                    : 'bg-slate-800/40 text-slate-400'
+                                }`}>
+                                  {user.active > 5
+                                    ? `🔥 High (${user.active} tasks)`
+                                    : user.active > 0
+                                    ? `⚡ Active (${user.active} tasks)`
+                                    : '💤 Idle'}
+                                </span>
+                              </td>
+                              <td className="py-3.5 text-center">
+                                <div className="flex items-center justify-center gap-3 min-w-[140px] max-w-[180px] mx-auto">
+                                  <span className="font-mono font-bold text-white text-[10px] w-8 text-right">{user.completed}</span>
+                                  <div className="flex-1 h-1.5 bg-slate-950/50 rounded-full overflow-hidden relative border border-slate-900">
+                                    <div
+                                      className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-indigo-500"
+                                      style={{ width: `${completionRatio}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="py-3.5 text-right pr-2 font-mono font-black text-emerald-400">
+                                {typeof user.accuracy === 'number' ? `${user.accuracy.toFixed(0)}%` : '100%'}
+                              </td>
+                            </tr>
+                          );
+                        })
                       ) : (
                         <tr>
                           <td colSpan={4} className="py-8 text-center text-slate-500">
