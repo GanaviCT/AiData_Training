@@ -116,7 +116,7 @@ const SystemMonitor: React.FC = () => {
         const healthData = await healthRes.value.json();
         setHealth(healthData);
       } else {
-        throw new Error("Failed to fetch system SLA logs");
+        throw new Error("Failed to fetch system health status");
       }
 
       if (queueRes.status === 'fulfilled' && queueRes.value.ok) {
@@ -252,66 +252,87 @@ const SystemMonitor: React.FC = () => {
     }
   };
 
-  if (loading && !health) {
+  // Guard against null health object before rendering the core dashboard views
+  if (!health) {
     return (
-      <div className="p-8 text-center text-slate-400 flex items-center justify-center min-h-[300px]">
-        <RefreshCw className="w-8 h-8 animate-spin text-cyan-400 mr-3" />
-        <span className="font-semibold">Querying system telemetry indicators...</span>
+      <div className="p-8 text-center text-slate-400 flex flex-col items-center justify-center min-h-[400px]">
+        {error ? (
+          <div className="p-6 border border-rose-500/20 bg-rose-500/5 rounded-3xl text-rose-300 text-sm max-w-md text-center space-y-4">
+            <XCircle className="w-10 h-10 text-rose-450 mx-auto" />
+            <h3 className="font-bold text-white text-base">System Telemetry Connection Issue</h3>
+            <p className="text-xs text-slate-400">{error}. Please ensure the backend server is running.</p>
+            <button
+              onClick={fetchMetrics}
+              className="px-4 py-2 bg-slate-900 hover:bg-slate-850 border border-slate-800 rounded-xl text-xs font-bold text-white transition cursor-pointer"
+            >
+              Retry Connection
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center">
+            <RefreshCw className="w-8 h-8 animate-spin text-cyan-400 mr-3" />
+            <span className="font-semibold text-slate-300">Querying platform telemetries...</span>
+          </div>
+        )}
       </div>
     );
   }
 
-  // Calculate Business metrics
-  const totalTasks = tasks.length;
-  const pendingTasks = tasks.filter(t => t.status === 'pending').length;
-  const inProgressTasks = tasks.filter(t => t.status === 'in-progress').length;
-  const completedTasks = tasks.filter(t => t.status === 'completed').length;
-  const rejectedTasks = tasks.filter(t => t.status === 'rejected').length;
+  // Calculate Business metrics with defensive array verification
+  const totalTasks = Array.isArray(tasks) ? tasks.length : 0;
+  const pendingTasks = Array.isArray(tasks) ? tasks.filter(t => t.status === 'pending').length : 0;
+  const inProgressTasks = Array.isArray(tasks) ? tasks.filter(t => t.status === 'in-progress').length : 0;
+  const completedTasks = Array.isArray(tasks) ? tasks.filter(t => t.status === 'completed').length : 0;
+  const rejectedTasks = Array.isArray(tasks) ? tasks.filter(t => t.status === 'rejected').length : 0;
 
-  const awaitingQATasks = tasks.filter(t => {
+  const awaitingQATasks = Array.isArray(tasks) ? tasks.filter(t => {
     if (t.status !== 'completed') return false;
-    if (!t.annotations || t.annotations.length === 0) return true;
+    if (!t.annotations || !Array.isArray(t.annotations) || t.annotations.length === 0) return true;
     const sortedAnns = [...t.annotations].sort((a, b) => b.version - a.version);
     const latest = sortedAnns[0];
-    return !latest.qa_results || latest.qa_results.length === 0;
-  }).length;
+    return !latest || !latest.qa_results || latest.qa_results.length === 0;
+  }).length : 0;
 
-  const approvedTasks = tasks.filter(t => {
+  const approvedTasks = Array.isArray(tasks) ? tasks.filter(t => {
     if (t.status !== 'completed') return false;
-    if (!t.annotations || t.annotations.length === 0) return false;
+    if (!t.annotations || !Array.isArray(t.annotations) || t.annotations.length === 0) return false;
     const sortedAnns = [...t.annotations].sort((a, b) => b.version - a.version);
     const latest = sortedAnns[0];
-    return latest.qa_results && latest.qa_results.length > 0 && latest.qa_results[latest.qa_results.length - 1].approved;
-  }).length;
+    return latest && latest.qa_results && latest.qa_results.length > 0 && latest.qa_results[latest.qa_results.length - 1].approved;
+  }).length : 0;
 
-  // Workload calculations
+  // Workload calculations with defensive array verification
   const workloadMap: { [username: string]: { completed: number; active: number; accuracy?: number } } = {};
-  leaderboard.forEach(entry => {
-    workloadMap[entry.username] = {
-      completed: entry.tasks_completed,
-      active: 0,
-      accuracy: entry.accuracy_rating
-    };
-  });
+  if (Array.isArray(leaderboard)) {
+    leaderboard.forEach(entry => {
+      workloadMap[entry.username] = {
+        completed: entry.tasks_completed,
+        active: 0,
+        accuracy: entry.accuracy_rating
+      };
+    });
+  }
 
-  tasks.forEach(task => {
-    if (task.assigned_to && task.assigned_to.username) {
-      const username = task.assigned_to.username;
-      if (!workloadMap[username]) {
-        workloadMap[username] = { completed: 0, active: 0 };
+  if (Array.isArray(tasks)) {
+    tasks.forEach(task => {
+      if (task.assigned_to && task.assigned_to.username) {
+        const username = task.assigned_to.username;
+        if (!workloadMap[username]) {
+          workloadMap[username] = { completed: 0, active: 0 };
+        }
+        if (task.status === 'pending' || task.status === 'in-progress') {
+          workloadMap[username].active += 1;
+        }
       }
-      if (task.status === 'pending' || task.status === 'in-progress') {
-        workloadMap[username].active += 1;
-      }
-    }
-  });
+    });
+  }
 
   const workloads = Object.values(workloadMap).sort((a, b) => b.active - a.active);
 
   // DevOps circular gauge calculations
   const radius = 50;
   const circumference = 2 * Math.PI * radius;
-  const uptime = health?.uptime_percentage || 99.98;
+  const uptime = health.uptime_percentage;
   const strokeDashoffset = circumference - (uptime / 100) * circumference;
 
   const systemStatus = getSystemStatus();
@@ -554,7 +575,7 @@ const SystemMonitor: React.FC = () => {
                       Global Annotation Accuracy
                     </span>
                     <span className="font-mono text-white font-black text-sm bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded">
-                      {qaStats.accuracy_percentage.toFixed(1)}%
+                      {qaStats.accuracy_percentage ? qaStats.accuracy_percentage.toFixed(1) : '0.0'}%
                     </span>
                   </div>
                 )}
@@ -637,9 +658,9 @@ const SystemMonitor: React.FC = () => {
                 <div className="text-2xl font-black text-white">{uptime.toFixed(2)}%</div>
                 <div className="flex items-center gap-1.5">
                   <span className={`inline-block w-2.5 h-2.5 rounded-full ${uptime >= 99.5 ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500 animate-pulse'}`} />
-                  <span className="text-xs font-bold text-slate-300">{health?.sla_status}</span>
+                  <span className="text-xs font-bold text-slate-300">{health.sla_status}</span>
                 </div>
-                <span className="text-[10px] text-slate-400 block">SLA Commitment Target: {health?.sla_target_percentage.toFixed(1)}%</span>
+                <span className="text-[10px] text-slate-400 block">SLA Commitment Target: {health.sla_target_percentage.toFixed(1)}%</span>
               </div>
 
               {/* Circular SVG Gauge */}
@@ -677,7 +698,7 @@ const SystemMonitor: React.FC = () => {
                 <div className="space-y-1">
                   <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block font-semibold">Average Response Time</span>
                   <div className="text-2xl font-black text-white flex items-baseline gap-1">
-                    {health?.latency_metrics.avg_ms.toFixed(1)} <span className="text-xs font-normal text-slate-400">ms</span>
+                    {health.latency_metrics.avg_ms.toFixed(1)} <span className="text-xs font-normal text-slate-400">ms</span>
                   </div>
                 </div>
                 <div className="p-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
@@ -688,11 +709,11 @@ const SystemMonitor: React.FC = () => {
               <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-850 text-xs">
                 <div>
                   <span className="text-slate-400 block">Min Latency</span>
-                  <span className="font-bold text-white">{health?.latency_metrics.min_ms.toFixed(1)} ms</span>
+                  <span className="font-bold text-white">{health.latency_metrics.min_ms.toFixed(1)} ms</span>
                 </div>
                 <div>
                   <span className="text-slate-400 block">Peak Latency</span>
-                  <span className="font-bold text-white">{health?.latency_metrics.max_ms.toFixed(1)} ms</span>
+                  <span className="font-bold text-white">{health.latency_metrics.max_ms.toFixed(1)} ms</span>
                 </div>
               </div>
             </div>
@@ -703,7 +724,7 @@ const SystemMonitor: React.FC = () => {
                 <div className="space-y-1">
                   <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Network Traffic</span>
                   <div className="text-2xl font-black text-white">
-                    {health?.requests_total} <span className="text-xs font-normal text-slate-400">requests</span>
+                    {health.requests_total} <span className="text-xs font-normal text-slate-400">requests</span>
                   </div>
                 </div>
                 <div className="p-2 bg-pink-500/10 border border-pink-500/20 rounded-xl">
@@ -714,11 +735,11 @@ const SystemMonitor: React.FC = () => {
               <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-850 text-xs">
                 <div>
                   <span className="text-slate-400 block">Successful Requests</span>
-                  <span className="font-bold text-emerald-400">{health ? (health.requests_total - health.requests_failed) : 0}</span>
+                  <span className="font-bold text-emerald-400">{health.requests_total - health.requests_failed}</span>
                 </div>
                 <div>
                   <span className="text-slate-400 block">HTTP 5xx Failures</span>
-                  <span className={`font-bold ${health?.requests_failed && health.requests_failed > 0 ? 'text-rose-400' : 'text-slate-400'}`}>{health?.requests_failed}</span>
+                  <span className={`font-bold ${health.requests_failed > 0 ? 'text-rose-400' : 'text-slate-400'}`}>{health.requests_failed}</span>
                 </div>
               </div>
             </div>
@@ -731,7 +752,7 @@ const SystemMonitor: React.FC = () => {
               Service Integrations Health State
             </h4>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
-              {health && Object.entries(health.services).map(([name, detail]) => (
+              {health.services && Object.entries(health.services).map(([name, detail]) => (
                 <div key={name} className={`border rounded-2xl p-4 flex flex-col items-center justify-center text-center space-y-2.5 transition-all ${getStatusColor(detail.status)}`}>
                   <span className="text-xs font-bold capitalize tracking-wide">{name === 'postgresql' ? 'PostgreSQL' : name === 'mongodb' ? 'MongoDB' : name === 'ml_engine' ? 'ML Engine' : name === 'message_queue' ? 'Message Queue' : name}</span>
                   {getStatusIcon(detail.status)}
@@ -791,7 +812,9 @@ const SystemMonitor: React.FC = () => {
                     <Zap className="w-4 h-4 text-amber-400" />
                     <span>Job Throughput Rate</span>
                   </div>
-                  <span className="font-mono text-white font-bold">{queue?.throughput_jobs_per_sec.toFixed(3)}/sec</span>
+                  <span className="font-mono text-white font-bold">
+                    {queue ? queue.throughput_jobs_per_sec.toFixed(3) : '0.000'}/sec
+                  </span>
                 </div>
 
                 <button
