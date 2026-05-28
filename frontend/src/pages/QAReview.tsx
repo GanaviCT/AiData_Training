@@ -16,7 +16,7 @@ interface QAItem {
     id: number;
     label: string;
     confidence: number;
-    created_by: { username: string };
+    created_by: { username: string; email?: string };
     qa_results: Array<{
       id: number;
       approved: boolean;
@@ -201,6 +201,12 @@ const QAReview: React.FC = () => {
       });
 
       if (response.ok) {
+        const taskItem = (spotCheckActive ? spotCheckItems : items).find(item => item.id === taskId);
+        const latestAnnotation = taskItem?.annotations && taskItem.annotations.length > 0
+          ? taskItem.annotations[taskItem.annotations.length - 1]
+          : null;
+        const annotatorEmail = latestAnnotation?.created_by?.email || (latestAnnotation?.created_by?.username && latestAnnotation.created_by.username.includes('@') ? latestAnnotation.created_by.username : 'ganavigowda.ct@gmail.com');
+
         if (spotCheckActive) {
           setReviewedSessionIds(prev => [...prev, taskId]);
           setSessionReviews(prev => ({
@@ -209,9 +215,13 @@ const QAReview: React.FC = () => {
           }));
 
           if (approved) {
-            showToast(`Task #00${taskId} approved in session!`, 'success');
+            const msg = `Task #00${taskId} approved in session! Notification sent to ${annotatorEmail}`;
+            showToast(msg, 'success');
+            alert(msg);
           } else {
-            showToast(`Task #00${taskId} rejected in session!`, 'error');
+            const msg = `Task #00${taskId} rejected in session! Notification sent to ${annotatorEmail}`;
+            showToast(msg, 'error');
+            alert(msg);
           }
 
           setComments(prev => {
@@ -228,9 +238,13 @@ const QAReview: React.FC = () => {
           });
 
           if (approved) {
-            showToast(`Task #00${taskId} approved successfully!`, 'success');
+            const msg = `Task #00${taskId} approved successfully! Notification sent to ${annotatorEmail}`;
+            showToast(msg, 'success');
+            alert(msg);
           } else {
-            showToast(`Task #00${taskId} rejected successfully!`, 'error');
+            const msg = `Task #00${taskId} rejected successfully! Notification sent to ${annotatorEmail}`;
+            showToast(msg, 'error');
+            alert(msg);
           }
         }
 

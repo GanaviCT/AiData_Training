@@ -25,7 +25,7 @@ spec:
           env:
             - name: DATABASE_URL
               value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres-service.trainlyft-production.svc.cluster.local:5432/platform"
-            - name: MONGO_URI
+            - name: MONGO_URL
               value: "mongodb://$(MONGO_USER):$(MONGO_PASSWORD)@mongodb-service.trainlyft-production.svc.cluster.local:27017/audit_trail?authSource=admin"
             - name: REDIS_URL
               value: "redis://redis-service.trainlyft-production.svc.cluster.local:6379/0"
@@ -109,17 +109,17 @@ spec:
           image: trainlyft-frontend:latest
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 3000
+            - containerPort: 80
           livenessProbe:
             httpGet:
               path: /
-              port: 3000
+              port: 80
             initialDelaySeconds: 15
             periodSeconds: 15
           readinessProbe:
             httpGet:
               path: /
-              port: 3000
+              port: 80
             initialDelaySeconds: 10
             periodSeconds: 10
 ---
@@ -133,6 +133,6 @@ metadata:
 spec:
   ports:
     - port: 3000
-      targetPort: 3000
+      targetPort: 80
   selector:
     app: frontend

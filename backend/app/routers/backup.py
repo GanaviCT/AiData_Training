@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.services.auth import RoleChecker
+from app.services.auth import PermissionChecker
 from app.models.user import User
 from app.services.backup import BackupService, BACKUP_DIR
 from app.services.audit import AuditService
@@ -17,7 +17,7 @@ class RestoreLocalRequest(BaseModel):
 
 @router.get("", response_model=list)
 def get_backups(
-    current_user: User = Depends(RoleChecker(["admin"]))
+    current_user: User = Depends(PermissionChecker("system:backup"))
 ):
     """
     Lists all available database backups (Admin only).
@@ -27,7 +27,7 @@ def get_backups(
 @router.post("/export")
 def trigger_export(
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker(["admin"]))
+    current_user: User = Depends(PermissionChecker("system:backup"))
 ):
     """
     Triggers a manual database backup (Admin only).
@@ -56,7 +56,7 @@ def trigger_export(
 @router.get("/download/{filename}")
 def download_backup(
     filename: str,
-    current_user: User = Depends(RoleChecker(["admin"]))
+    current_user: User = Depends(PermissionChecker("system:backup"))
 ):
     """
     Downloads a specific backup zip file (Admin only).
@@ -74,7 +74,7 @@ def download_backup(
 def restore_local_backup(
     req: RestoreLocalRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker(["admin"]))
+    current_user: User = Depends(PermissionChecker("system:backup"))
 ):
     """
     Restores the database state from a local backup file (Admin only).
@@ -108,7 +108,7 @@ def restore_local_backup(
 def upload_and_restore_backup(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker(["admin"]))
+    current_user: User = Depends(PermissionChecker("system:backup"))
 ):
     """
     Uploads a backup zip file and restores the database (Admin only).

@@ -13,6 +13,7 @@ class UserOut(BaseModel):
     email: Optional[str] = None
     mfa_enabled: Optional[bool] = False
     gdpr_consent: Optional[bool] = False
+    permissions: Optional[list[str]] = []
 
     class Config:
         from_attributes = True

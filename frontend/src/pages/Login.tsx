@@ -22,6 +22,7 @@ const Login: React.FC = () => {
   const [ssoProvider, setSsoProvider] = useState<'google' | 'github'>('google');
   const [ssoEmail, setSsoEmail] = useState('');
   const [ssoUsername, setSsoUsername] = useState('');
+  const [ssoRole, setSsoRole] = useState('annotator');
   
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -140,6 +141,7 @@ const Login: React.FC = () => {
     setSsoProvider(provider);
     setSsoEmail(provider === 'google' ? 'sso.google@trainlyft.com' : 'sso.github@trainlyft.com');
     setSsoUsername(provider === 'google' ? 'sso_google_admin' : 'sso_github_annotator');
+    setSsoRole('annotator');
     setShowSsoModal(true);
   };
 
@@ -159,6 +161,7 @@ const Login: React.FC = () => {
           provider: ssoProvider,
           email: ssoEmail,
           username: ssoUsername,
+          role: ssoRole,
         }),
       });
 
@@ -179,9 +182,45 @@ const Login: React.FC = () => {
     }
   };
 
+  const triggerDirectLogin = async (userVal: string, passwordVal: string) => {
+    setUsername(userVal);
+    setPassword(passwordVal);
+    setError(null);
+    setLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username: userVal, password: passwordVal }),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.detail || 'Login failed. Please check credentials.');
+      }
+
+      const data = await response.json();
+      if (data.status === 'mfa_required') {
+        setMfaRequired(true);
+        setMfaToken(data.mfa_token);
+      } else {
+        dispatch(setCredentials({
+          token: data.access_token,
+          user: data.user
+        }));
+      }
+    } catch (err: any) {
+      setError(err.message || 'Network error occurred.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const fillCredentials = (user: string) => {
-    setUsername(user);
-    setPassword(`${user}123`);
+    triggerDirectLogin(user, `${user}123`);
   };
 
   return (
@@ -377,30 +416,39 @@ const Login: React.FC = () => {
             {(() => {
               const params = new URLSearchParams(window.location.search);
               const pageParam = params.get('page');
-              let visibleRoles = ['admin', 'annotator', 'reviewer'];
+              let visibleRoles = ['admin', 'annotator', 'hg_reviewer', 'client_reviewer'];
               if (pageParam === 'annotation') {
                 visibleRoles = ['annotator'];
               } else if (pageParam === 'qa') {
-                visibleRoles = ['reviewer'];
+                visibleRoles = ['hg_reviewer', 'client_reviewer'];
               } else if (pageParam === 'tasks' || pageParam === 'dashboard') {
                 visibleRoles = ['admin'];
               }
               
+              const gridCols = visibleRoles.length === 1 ? 'grid-cols-1' : (visibleRoles.length === 2 ? 'grid-cols-2' : 'grid-cols-2');
+
               return (
                 <>
                   <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-3 text-center">
                     Quick-Login Demo Accounts
                   </span>
-                  <div className="grid grid-cols-3 gap-2">
-                    {visibleRoles.map((role) => (
-                      <button
-                        key={role}
-                        onClick={() => fillCredentials(role)}
-                        className="py-2 px-1 text-center bg-slate-950/30 hover:bg-slate-950/50 text-[11px] font-medium text-slate-300 rounded-xl border border-slate-800/80 hover:border-slate-700 hover:text-white transition-all duration-200 capitalize cursor-pointer"
-                      >
-                        {role}
-                      </button>
-                    ))}
+                  <div className={`grid ${gridCols} gap-2`}>
+                    {visibleRoles.map((role) => {
+                      const displayLabel = 
+                        role === 'hg_reviewer' ? 'HG Reviewer' :
+                        role === 'client_reviewer' ? 'Client Reviewer' :
+                        role.charAt(0).toUpperCase() + role.slice(1);
+
+                      return (
+                        <button
+                          key={role}
+                          onClick={() => fillCredentials(role)}
+                          className="py-2 px-1 text-center bg-slate-950/30 hover:bg-slate-950/50 text-[11px] font-medium text-slate-300 rounded-xl border border-slate-800/80 hover:border-slate-700 hover:text-white transition-all duration-200 cursor-pointer"
+                        >
+                          {displayLabel}
+                        </button>
+                      );
+                    })}
                   </div>
                 </>
               );
@@ -455,8 +503,21 @@ const Login: React.FC = () => {
                 />
               </div>
 
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Assigned SSO Platform Role</label>
+                <select
+                  value={ssoRole}
+                  onChange={(e) => setSsoRole(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950/50 border border-slate-800/80 rounded-xl text-xs text-white focus:outline-none focus:border-cyan-500/50 cursor-pointer"
+                >
+                  <option value="annotator">Annotator (Data Worker)</option>
+                  <option value="reviewer">QA Reviewer (Quality Expert)</option>
+                  <option value="admin">Administrator (Manager)</option>
+                </select>
+              </div>
+
               <div className="text-[10px] text-slate-500 leading-relaxed border-t border-slate-850/60 pt-3 font-normal">
-                💡 Logins with usernames containing <code>admin</code> will automatically provision an <strong>Administrator</strong> account; otherwise an <strong>Annotator</strong> profile is created.
+                💡 A new account registered via SSO will be provisioned with your selected platform role and mapped to granular system permissions dynamically.
               </div>
 
               <div className="grid grid-cols-2 gap-3 pt-2">

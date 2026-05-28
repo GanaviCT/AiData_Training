@@ -46,6 +46,10 @@ const Settings: React.FC = () => {
   const [backups, setBackups] = useState<BackupItem[]>([]);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
 
+  // Pending User Approvals States
+  const [pendingUsers, setPendingUsers] = useState<any[]>([]);
+  const [selectedRoles, setSelectedRoles] = useState<Record<number, string>>({});
+
   const fetchBackups = async () => {
     if (user?.role !== 'admin' || !token) return;
     try {
@@ -60,6 +64,49 @@ const Settings: React.FC = () => {
       }
     } catch (err) {
       console.error("Failed to load backups:", err);
+    }
+  };
+
+  const fetchPendingUsers = async () => {
+    if (user?.role?.toLowerCase() !== 'admin' || !token) return;
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/users`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const pending = data.filter((u: any) => u.role.toLowerCase() === 'pending');
+        setPendingUsers(pending);
+      }
+    } catch (err) {
+      console.error("Failed to load pending users:", err);
+    }
+  };
+
+  const handleApproveUser = async (userId: number) => {
+    const assignedRole = selectedRoles[userId] || 'annotator';
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/users/${userId}/approve`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ role: assignedRole })
+      });
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.detail || "Approval failed.");
+      }
+      showNotification("User approved and role assigned successfully!");
+      fetchPendingUsers();
+    } catch (err: any) {
+      showNotification(err.message || "Failed to approve user.", true);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -88,6 +135,7 @@ const Settings: React.FC = () => {
   useEffect(() => {
     checkCurrentUserDetails();
     fetchBackups();
+    fetchPendingUsers();
   }, [token]);
 
   const showNotification = (msg: string, isError = false) => {
@@ -529,137 +577,208 @@ const Settings: React.FC = () => {
 
         {/* RIGHT COLUMN: Backup & Disaster Recovery (Admin Only) */}
         <div>
-          {user?.role === 'admin' ? (
-            <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/80 rounded-3xl p-6 relative overflow-hidden shadow-xl shadow-cyan-500/5 h-full flex flex-col">
-              <div className="absolute -top-12 -right-12 w-24 h-24 bg-indigo-500/5 rounded-full blur-2xl" />
-              
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-cyan-500/10 rounded-2xl text-cyan-400 border border-cyan-500/20">
-                    <Database className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-white tracking-tight">System Backup & Recovery</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Manage snapshots of SQL and MongoDB data logs</p>
-                  </div>
-                </div>
-                <button
-                  onClick={fetchBackups}
-                  disabled={loading}
-                  className="p-2 text-slate-400 hover:text-cyan-400 rounded-xl hover:bg-slate-800/50 border border-transparent hover:border-slate-700/55 transition"
-                  title="Refresh backups list"
-                >
-                  <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                </button>
-              </div>
-
-              {/* Action Panels */}
-              <div className="space-y-4 mb-6">
-                <div className="grid grid-cols-2 gap-3">
-                  {/* Export Button */}
-                  <button
-                    onClick={handleGenerateBackup}
-                    disabled={loading}
-                    className="flex flex-col items-center justify-center p-4 bg-slate-950/45 hover:bg-slate-950 border border-slate-850 hover:border-cyan-500/35 rounded-2xl text-center transition group"
-                  >
-                    <Download className="w-6 h-6 text-cyan-400 group-hover:scale-110 transition duration-300 mb-2" />
-                    <span className="text-xs font-bold text-white">Generate Snapshot</span>
-                    <span className="text-[9px] text-slate-500 mt-0.5">Save DB state locally</span>
-                  </button>
-
-                  {/* Upload Backup */}
-                  <label className="flex flex-col items-center justify-center p-4 bg-slate-950/45 hover:bg-slate-950 border border-slate-850 hover:border-cyan-500/35 rounded-2xl text-center cursor-pointer transition group">
-                    <UploadCloud className="w-6 h-6 text-indigo-400 group-hover:scale-110 transition duration-300 mb-2" />
-                    <span className="text-xs font-bold text-white">Upload Backup</span>
-                    <span className="text-[9px] text-slate-500 mt-0.5">Restore from .zip file</span>
-                    <input
-                      type="file"
-                      accept=".zip"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          setUploadFile(file);
-                        }
-                      }}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
-
-                {uploadFile && (
-                  <form onSubmit={handleUploadBackup} className="p-3 bg-indigo-500/5 border border-indigo-500/20 rounded-xl flex items-center justify-between animate-in fade-in duration-200">
-                    <div className="flex items-center gap-2">
-                      <FileArchive className="w-4 h-4 text-indigo-400" />
-                      <span className="text-xs text-slate-300 font-medium truncate max-w-[180px]">{uploadFile.name}</span>
-                    </div>
-                    <div className="flex gap-1.5">
-                      <button
-                        type="submit"
-                        disabled={loading}
-                        className="px-2.5 py-1 bg-indigo-500 hover:bg-indigo-400 text-white rounded-lg text-[10px] font-bold transition"
-                      >
-                        Restore
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setUploadFile(null)}
-                        className="px-2.5 py-1 bg-slate-850 hover:bg-slate-850/80 text-slate-400 rounded-lg text-[10px] font-semibold transition"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </form>
-                )}
-              </div>
-
-              {/* Local Backups List */}
-              <div className="flex-1 flex flex-col min-h-[220px]">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-3">Snapshots on Server</span>
+          {user?.role?.toLowerCase() === 'admin' ? (
+            <div className="space-y-8">
+              <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/80 rounded-3xl p-6 relative overflow-hidden shadow-xl shadow-cyan-500/5 flex flex-col">
+                <div className="absolute -top-12 -right-12 w-24 h-24 bg-indigo-500/5 rounded-full blur-2xl" />
                 
-                {backups.length === 0 ? (
-                  <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-slate-800 rounded-2xl p-6 text-center">
-                    <FileArchive className="w-8 h-8 text-slate-700 mb-2" />
-                    <span className="text-xs text-slate-500">No backups found</span>
-                    <span className="text-[10px] text-slate-600 mt-1">Click "Generate Snapshot" above to create one.</span>
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-cyan-500/10 rounded-2xl text-cyan-400 border border-cyan-500/20">
+                      <Database className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-white tracking-tight">System Backup & Recovery</h3>
+                      <p className="text-xs text-slate-400 mt-0.5">Manage snapshots of SQL and MongoDB data logs</p>
+                    </div>
                   </div>
-                ) : (
-                  <div className="flex-1 overflow-y-auto max-h-[260px] space-y-2 pr-1">
-                    {backups.map((b) => (
-                      <div key={b.filename} className="p-3 bg-slate-950/45 hover:bg-slate-950 border border-slate-850 rounded-xl flex items-center justify-between group transition">
-                        <div className="flex items-center gap-3">
-                          <FileArchive className="w-5 h-5 text-cyan-500/70" />
-                          <div>
-                            <span className="text-xs font-semibold text-slate-200 block truncate max-w-[180px]" title={b.filename}>
-                              {b.filename}
-                            </span>
-                            <span className="text-[10px] text-slate-500 block mt-0.5">
-                              {formatBytes(b.size_bytes)} • {new Date(b.created_at).toLocaleString()}
-                            </span>
+                  <button
+                    onClick={fetchBackups}
+                    disabled={loading}
+                    className="p-2 text-slate-400 hover:text-cyan-400 rounded-xl hover:bg-slate-800/50 border border-transparent hover:border-slate-700/55 transition"
+                    title="Refresh backups list"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                  </button>
+                </div>
+
+                {/* Action Panels */}
+                <div className="space-y-4 mb-6">
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Export Button */}
+                    <button
+                      onClick={handleGenerateBackup}
+                      disabled={loading}
+                      className="flex flex-col items-center justify-center p-4 bg-slate-950/45 hover:bg-slate-950 border border-slate-850 hover:border-cyan-500/35 rounded-2xl text-center transition group"
+                    >
+                      <Download className="w-6 h-6 text-cyan-400 group-hover:scale-110 transition duration-300 mb-2" />
+                      <span className="text-xs font-bold text-white">Generate Snapshot</span>
+                      <span className="text-[9px] text-slate-500 mt-0.5">Save DB state locally</span>
+                    </button>
+
+                    {/* Upload Backup */}
+                    <label className="flex flex-col items-center justify-center p-4 bg-slate-950/45 hover:bg-slate-950 border border-slate-850 hover:border-cyan-500/35 rounded-2xl text-center cursor-pointer transition group">
+                      <UploadCloud className="w-6 h-6 text-indigo-400 group-hover:scale-110 transition duration-300 mb-2" />
+                      <span className="text-xs font-bold text-white">Upload Backup</span>
+                      <span className="text-[9px] text-slate-500 mt-0.5">Restore from .zip file</span>
+                      <input
+                        type="file"
+                        accept=".zip"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setUploadFile(file);
+                          }
+                        }}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+
+                  {uploadFile && (
+                    <form onSubmit={handleUploadBackup} className="p-3 bg-indigo-500/5 border border-indigo-500/20 rounded-xl flex items-center justify-between animate-in fade-in duration-200">
+                      <div className="flex items-center gap-2">
+                        <FileArchive className="w-4 h-4 text-indigo-400" />
+                        <span className="text-xs text-slate-300 font-medium truncate max-w-[180px]">{uploadFile.name}</span>
+                      </div>
+                      <div className="flex gap-1.5">
+                        <button
+                          type="submit"
+                          disabled={loading}
+                          className="px-2.5 py-1 bg-indigo-500 hover:bg-indigo-400 text-white rounded-lg text-[10px] font-bold transition"
+                        >
+                          Restore
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setUploadFile(null)}
+                          className="px-2.5 py-1 bg-slate-850 hover:bg-slate-850/80 text-slate-400 rounded-lg text-[10px] font-semibold transition"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </div>
+
+                {/* Local Backups List */}
+                <div className="flex-1 flex flex-col min-h-[220px]">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-3">Snapshots on Server</span>
+                  
+                  {backups.length === 0 ? (
+                    <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-slate-800 rounded-2xl p-6 text-center">
+                      <FileArchive className="w-8 h-8 text-slate-700 mb-2" />
+                      <span className="text-xs text-slate-500">No backups found</span>
+                      <span className="text-[10px] text-slate-600 mt-1">Click "Generate Snapshot" above to create one.</span>
+                    </div>
+                  ) : (
+                    <div className="flex-1 overflow-y-auto max-h-[260px] space-y-2 pr-1">
+                      {backups.map((b) => (
+                        <div key={b.filename} className="p-3 bg-slate-950/45 hover:bg-slate-950 border border-slate-850 rounded-xl flex items-center justify-between group transition">
+                          <div className="flex items-center gap-3">
+                            <FileArchive className="w-5 h-5 text-cyan-500/70" />
+                            <div>
+                              <span className="text-xs font-semibold text-slate-200 block truncate max-w-[180px]" title={b.filename}>
+                                {b.filename}
+                              </span>
+                              <span className="text-[10px] text-slate-500 block mt-0.5">
+                                {formatBytes(b.size_bytes)} • {new Date(b.created_at).toLocaleString()}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 opacity-80 group-hover:opacity-100 transition">
+                            <button
+                              onClick={() => handleRestoreLocal(b.filename)}
+                              disabled={loading}
+                              className="px-2.5 py-1 bg-slate-800 hover:bg-cyan-500 hover:text-slate-950 text-slate-300 text-[10px] font-bold rounded-lg border border-slate-700/80 hover:border-transparent transition"
+                            >
+                              Restore
+                            </button>
+                            <a
+                              href={`${API_BASE_URL}/admin/backups/download/${b.filename}?token=${token}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-lg border border-slate-700/80 transition"
+                              title="Download backup file"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                            </a>
                           </div>
                         </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
 
-                        <div className="flex items-center gap-1.5 opacity-80 group-hover:opacity-100 transition">
-                          <button
-                            onClick={() => handleRestoreLocal(b.filename)}
-                            disabled={loading}
-                            className="px-2.5 py-1 bg-slate-800 hover:bg-cyan-500 hover:text-slate-950 text-slate-300 text-[10px] font-bold rounded-lg border border-slate-700/80 hover:border-transparent transition"
-                          >
-                            Restore
-                          </button>
-                          <a
-                            href={`${API_BASE_URL}/admin/backups/download/${b.filename}?token=${token}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-lg border border-slate-700/80 transition"
-                            title="Download backup file"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                          </a>
-                        </div>
-                      </div>
-                    ))}
+              {/* Pending Approvals Card */}
+              <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/80 rounded-3xl p-6 relative overflow-hidden shadow-xl shadow-cyan-500/5">
+                <div className="absolute -bottom-12 -right-12 w-24 h-24 bg-amber-500/5 rounded-full blur-2xl" />
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-amber-500/10 rounded-2xl text-amber-500 border border-amber-500/20">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-white tracking-tight">Pending User Approvals</h3>
+                      <p className="text-xs text-slate-400 mt-0.5">Approve and assign roles to unrecognized SSO registrations</p>
+                    </div>
                   </div>
-                )}
+                  <button
+                    onClick={fetchPendingUsers}
+                    disabled={loading}
+                    className="p-2 text-slate-400 hover:text-amber-500 rounded-xl hover:bg-slate-800/50 border border-transparent hover:border-slate-700/55 transition"
+                    title="Refresh approvals list"
+                    type="button"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {pendingUsers.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center border border-dashed border-slate-800 rounded-2xl p-6 text-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-slate-700 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span className="text-xs text-slate-500 font-semibold">No pending approvals</span>
+                      <span className="text-[10px] text-slate-655 text-slate-500 mt-1">Users signing up with unrecognized email domains will appear here.</span>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+                      {pendingUsers.map((p) => (
+                        <div key={p.id} className="p-3 bg-slate-950/45 border border-slate-850 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 group transition">
+                          <div className="space-y-0.5">
+                            <span className="text-xs font-semibold text-white block">@{p.username}</span>
+                            <span className="text-[10px] text-slate-450 font-mono block">{p.email || 'No email associated'}</span>
+                          </div>
+                          
+                          <div className="flex items-center gap-2 shrink-0">
+                            <select
+                              value={selectedRoles[p.id] || 'annotator'}
+                              onChange={(e) => setSelectedRoles({ ...selectedRoles, [p.id]: e.target.value })}
+                              className="px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-[11px] text-white focus:outline-none focus:border-amber-500/50 cursor-pointer"
+                            >
+                              <option value="annotator">Annotator</option>
+                              <option value="reviewer">Reviewer</option>
+                              <option value="admin">Admin</option>
+                            </select>
+                            <button
+                              onClick={() => handleApproveUser(p.id)}
+                              disabled={loading}
+                              className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-[11px] font-bold rounded-lg transition cursor-pointer"
+                            >
+                              Approve
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           ) : (

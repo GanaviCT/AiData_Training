@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, status
 from typing import List
 from app.services.annotation import AnnotationService
-from app.services.auth import AuthService, RoleChecker
+from app.services.auth import AuthService, RoleChecker, PermissionChecker
 from app.schemas.annotation import AnnotationCreate, AnnotationOut
 from app.models.user import User
 from app.services.audit import AuditService
@@ -13,7 +13,7 @@ router = APIRouter(prefix="/annotations", tags=["Annotations"])
 def create_annotation(
     annotation_in: AnnotationCreate,
     annotation_service: AnnotationService = Depends(),
-    current_user: User = Depends(RoleChecker(["annotator", "admin"]))
+    current_user: User = Depends(PermissionChecker("annotations:create"))
 ):
     ann = annotation_service.create_annotation(annotation_in, current_user.id)
     

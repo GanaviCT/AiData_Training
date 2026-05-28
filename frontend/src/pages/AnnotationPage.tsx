@@ -12,7 +12,9 @@ import {
   Database,
   History,
   AlertCircle,
-  ExternalLink
+  ExternalLink,
+  Check,
+  X
 } from 'lucide-react';
 
 interface AnnotationHistory {
@@ -47,6 +49,32 @@ const AnnotationPage: React.FC<AnnotationPageProps> = ({ setActivePage }) => {
 
   // Image load error fallback state
   const [imageError, setImageError] = useState(false);
+
+  // Users for QA recipient select dropdown
+  const [users, setUsers] = useState<any[]>([]);
+  const [selectedReviewerEmail, setSelectedReviewerEmail] = useState('');
+
+  // Toast and Submitting state
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [toastTimeout, setToastTimeout] = useState<any | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    if (toastTimeout) {
+      clearTimeout(toastTimeout);
+    }
+    setToast({ message, type });
+    const timer = setTimeout(() => {
+      setToast(null);
+    }, 4000);
+    setToastTimeout(timer);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (toastTimeout) clearTimeout(toastTimeout);
+    };
+  }, [toastTimeout]);
 
   // Video States
   const [duration, setDuration] = useState(0);
@@ -98,6 +126,28 @@ const AnnotationPage: React.FC<AnnotationPageProps> = ({ setActivePage }) => {
     }
   };
 
+  const fetchUsers = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/users`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setUsers(data);
+      }
+    } catch (err) {
+      console.error("Error loading users:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (token) {
+      fetchUsers();
+    }
+  }, [token]);
+
   useEffect(() => {
     fetchHistory();
     // Reset inputs
@@ -111,6 +161,7 @@ const AnnotationPage: React.FC<AnnotationPageProps> = ({ setActivePage }) => {
     setStartTime(0);
     setEndTime(0);
     setVideoCurrentTime(0);
+    setSelectedReviewerEmail('');
   }, [activeTask]);
 
   // Request local LLM suggestion
@@ -150,7 +201,8 @@ const AnnotationPage: React.FC<AnnotationPageProps> = ({ setActivePage }) => {
 
   const handleSubmitAnnotation = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeTask || !selectedLabel) return;
+    if (!activeTask || !selectedLabel || submitting) return;
+    setSubmitting(true);
 
     // Detect if human corrected the AI suggestions
     let correctedLabel: string | null = null;
@@ -173,17 +225,29 @@ const AnnotationPage: React.FC<AnnotationPageProps> = ({ setActivePage }) => {
           task_id: activeTask.id,
           label: finalLabel,
           confidence: confidence,
-          corrected_label: correctedLabel
+          corrected_label: correctedLabel,
+          recipient_email: selectedReviewerEmail || null
         })
       });
 
       if (response.ok) {
-        dispatch(setActiveTask(null));
-        window.dispatchEvent(new CustomEvent('qa-count-updated'));
-        setActivePage('tasks');
+        const msg = `Annotation submitted! QA notification email sent to ${selectedReviewerEmail || 'reviewers'}`;
+        showToast(msg, 'success');
+        alert(msg);
+        setTimeout(() => {
+          dispatch(setActiveTask(null));
+          window.dispatchEvent(new CustomEvent('qa-count-updated'));
+          setActivePage('tasks');
+        }, 2000);
+      } else {
+        const data = await response.json();
+        showToast(data.detail || "Failed to submit annotation", 'error');
+        setSubmitting(false);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed submitting annotation:", err);
+      showToast(err.message || "Network error submitting annotation", 'error');
+      setSubmitting(false);
     }
   };
 
@@ -500,16 +564,68 @@ const AnnotationPage: React.FC<AnnotationPageProps> = ({ setActivePage }) => {
               </div>
             )}
 
+            {/* QA Reviewer Select Dropdown */}
+            <div className="space-y-3">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">
+                Select Reviewer / Admin to Notify *
+              </label>
+              <select
+                value={selectedReviewerEmail}
+                onChange={(e) => setSelectedReviewerEmail(e.target.value)}
+                className="w-full bg-slate-950/40 border border-slate-850 rounded-xl p-3 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/60 transition-colors"
+                required
+              >
+                <option value="">-- Choose Reviewer / Admin --</option>
+                {users
+                  .filter((u) => (u.role === 'reviewer' || u.role === 'admin') && (u.email || u.username.includes('@')))
+                  .map((u) => {
+                    const email = u.email || u.username;
+                    return (
+                      <option key={u.id} value={email} className="bg-slate-900 text-slate-300">
+                        {u.username} ({u.role.toUpperCase()}) {email ? `- ${email}` : ''}
+                      </option>
+                    );
+                  })}
+                {users.filter((u) => (u.role === 'reviewer' || u.role === 'admin') && (u.email || u.username.includes('@'))).length === 0 && (
+                  <option value="ganuyogi4@gmail.com" className="bg-slate-900 text-slate-300">
+                    System Administrator (ganuyogi4@gmail.com)
+                  </option>
+                )}
+              </select>
+            </div>
+
             <button
               type="submit"
-              disabled={!selectedLabel}
+              disabled={!selectedLabel || submitting}
               className="w-full py-3 bg-gradient-to-r from-cyan-500 to-indigo-500 hover:from-cyan-400 hover:to-indigo-400 text-white font-bold rounded-2xl text-xs tracking-wider uppercase transition-all shadow-lg shadow-cyan-500/10 active:scale-95 disabled:opacity-40"
             >
-              Submit Annotation
+              {submitting ? 'Submitting...' : 'Submit Annotation'}
             </button>
           </form>
         </div>
       </div>
+
+      {toast && (
+        <div className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-4 py-3.5 rounded-xl border shadow-2xl backdrop-blur-md transition-all duration-300 animate-slide-in-right ${
+          toast.type === 'success' 
+            ? 'bg-emerald-950/80 border-emerald-500/30 text-emerald-400' 
+            : 'bg-rose-950/80 border-rose-500/30 text-rose-400'
+        }`}>
+          {toast.type === 'success' ? (
+            <Check className="w-4 h-4 shrink-0 text-emerald-400" />
+          ) : (
+            <X className="w-4 h-4 shrink-0 text-rose-400" />
+          )}
+          <span className="text-xs font-semibold pr-1">{toast.message}</span>
+          <button 
+            type="button"
+            onClick={() => setToast(null)}
+            className="ml-1 hover:opacity-85 hover:bg-slate-800/40 p-1 rounded transition-all"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
     </div>
   );
 };

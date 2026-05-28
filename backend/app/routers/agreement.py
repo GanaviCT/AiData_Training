@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.services.auth import RoleChecker
+from app.services.auth import RoleChecker, PermissionChecker
 from app.services.agreement import AgreementService
 from app.services.audit import AuditService
 from app.models.user import User
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/annotations", tags=["Agreement (IAA)"])
 @router.get("/agreement", status_code=status.HTTP_200_OK)
 def get_agreement_metrics(
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker(["admin"]))
+    current_user: User = Depends(PermissionChecker("system:view"))
 ):
     """
     Fetch calculated Inter-Annotator Agreement (IAA) metrics including:
@@ -45,7 +45,7 @@ def get_agreement_metrics(
 @router.post("/seed-iaa", status_code=status.HTTP_201_CREATED)
 def seed_iaa_demo_data(
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker(["admin"]))
+    current_user: User = Depends(PermissionChecker("system:debug"))
 ):
     """
     Seeds demo tasks with multiple annotations from distinct users to

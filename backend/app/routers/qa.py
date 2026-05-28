@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, status
 from typing import List, Optional
 from app.services.qa import QAService
-from app.services.auth import AuthService, RoleChecker
+from app.services.auth import AuthService, RoleChecker, PermissionChecker
 from app.schemas.qa import QAReviewRequest, QAResultOut, QAStats
 from app.schemas.task import TaskOut
 from app.models.user import User
@@ -14,7 +14,7 @@ router = APIRouter(prefix="/qa", tags=["Quality Assurance"])
 def submit_review(
     review_req: QAReviewRequest,
     qa_service: QAService = Depends(),
-    current_user: User = Depends(RoleChecker(["admin"]))
+    current_user: User = Depends(PermissionChecker("qa:submit"))
 ):
     res = qa_service.submit_review(review_req, current_user.id)
     
@@ -48,7 +48,7 @@ def get_audit_sample(
     percentage: Optional[float] = None,
     count: Optional[int] = None,
     qa_service: QAService = Depends(),
-    current_user: User = Depends(RoleChecker(["admin"]))
+    current_user: User = Depends(PermissionChecker("qa:sample"))
 ):
     return qa_service.get_audit_sample(percentage=percentage, count=count)
 

@@ -7,7 +7,7 @@ from sqlalchemy import text
 from typing import Dict, Any, List
 from app.core.database import get_db
 from app.core.config import settings
-from app.services.auth import RoleChecker
+from app.services.auth import RoleChecker, PermissionChecker
 from app.models.user import User
 
 logger = logging.getLogger(__name__)
@@ -54,7 +54,7 @@ def track_request(path: str, duration: float, status_code: int):
 @router.get("/health")
 def get_system_health(
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker(["admin", "annotator", "reviewer"]))
+    current_user: User = Depends(PermissionChecker("system:view"))
 ) -> Dict[str, Any]:
     """Execute dynamic health checks across Postgres, MongoDB, Redis, ML Engine, and calculate SLA metrics"""
     

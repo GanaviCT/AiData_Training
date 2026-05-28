@@ -45,12 +45,13 @@ class QAService:
         try:
             submitter = self.db.query(User).filter(User.id == annotation.created_by_id).first()
             reviewer = self.db.query(User).filter(User.id == reviewer_id).first()
-            if submitter and submitter.email:
+            submitter_email = submitter.email or (submitter.username if submitter and "@" in submitter.username else None)
+            if submitter and submitter_email:
                 from app.services.email import EmailService
                 EmailService.send_qa_review_email(
                     submitter_username=submitter.username,
                     reviewer_username=reviewer.username if reviewer else "admin",
-                    recipient_email=submitter.email,
+                    recipient_email=submitter_email,
                     task_id=task.id,
                     task_type=task.type,
                     task_data=task.data[:200] if task.type == 'text' else task.data,

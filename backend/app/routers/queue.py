@@ -1,20 +1,20 @@
 from fastapi import APIRouter, Depends, status
 from app.services.queue import BackgroundQueueService
-from app.services.auth import RoleChecker
+from app.services.auth import RoleChecker, PermissionChecker
 from app.models.user import User
 
 router = APIRouter(prefix="/admin/queue", tags=["System Queue"])
 
 @router.get("/status")
 def get_queue_status(
-    current_user: User = Depends(RoleChecker(["admin"]))
+    current_user: User = Depends(PermissionChecker("system:view"))
 ):
     """Fetch live background worker execution metrics, queue size and history"""
     return BackgroundQueueService.get_status()
 
 @router.post("/clear")
 def clear_queue_history(
-    current_user: User = Depends(RoleChecker(["admin"]))
+    current_user: User = Depends(PermissionChecker("system:debug"))
 ):
     """Reset background worker statistics and logs"""
     BackgroundQueueService.clear_history()

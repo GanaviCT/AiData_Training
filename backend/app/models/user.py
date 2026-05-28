@@ -20,3 +20,8 @@ class User(Base):
     tasks_assigned = relationship("Task", back_populates="assigned_to")
     annotations_created = relationship("Annotation", back_populates="created_by")
     qa_reviews = relationship("QAResult", back_populates="reviewer")
+
+    @property
+    def permissions(self) -> list[str]:
+        from app.services.auth import ROLE_PERMISSIONS
+        return ROLE_PERMISSIONS.get(self.role.lower(), [])

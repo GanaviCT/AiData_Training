@@ -8,7 +8,7 @@ from app.schemas.auth import UserCreate, UserOut, Token, LoginRequest
 from app.services.auth import AuthService
 from app.services.audit import AuditService
 
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -27,7 +27,34 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Username already registered"
         )
+        
+    # Check if username is an email and extract domain suffix
+    username_lower = user_in.username.lower()
+    role = user_in.role or "annotator"
+    
+    if "@" in username_lower:
+        if username_lower.endswith("@hginfotech.io") or username_lower.endswith("@hginfotech.com"):
+            # Approved domain
+            pass
+        elif username_lower.endswith("@client.com"):
+            # Approved domain
+            pass
+        else:
+            # Unrecognized domain -> force to pending
+            role = "pending"
+    else:
+        # Non-email username format -> force to pending for safety
+        role = "pending"
+        
+    user_in.role = role
     user = user_repo.create(user_in)
+    
+    # Copy username to email if it is an email
+    if "@" in user.username:
+        user.email = user.username
+        db.commit()
+        db.refresh(user)
+
     AuditService.log_action(
         user_id=user.id,
         username=user.username,
@@ -156,6 +183,7 @@ class SSOLoginRequest(BaseModel):
     provider: str
     email: str
     username: str
+    role: Optional[str] = "annotator"
 
 @router.post("/sso/callback")
 def sso_callback(req: SSOLoginRequest, db: Session = Depends(get_db)):
@@ -169,7 +197,16 @@ def sso_callback(req: SSOLoginRequest, db: Session = Depends(get_db)):
     is_new = False
     if not user:
         is_new = True
-        role = "admin" if "admin" in req.username.lower() else "annotator"
+        
+        # Check email domain suffix to determine auto-provisioned role or place in pending queue
+        email_lower = req.email.lower() if req.email else ""
+        if email_lower.endswith("@hginfotech.io") or email_lower.endswith("@hginfotech.com"):
+            role = "annotator"
+        elif email_lower.endswith("@client.com"):
+            role = "reviewer"
+        else:
+            role = "pending"
+            
         user = User(
             username=req.username,
             hashed_password=get_password_hash(str(uuid.uuid4())),
@@ -214,3 +251,51 @@ def sso_callback(req: SSOLoginRequest, db: Session = Depends(get_db)):
         "token_type": "bearer",
         "user": user_out
     }
+
+class ApproveUserRequest(BaseModel):
+    role: str
+
+@router.put("/users/{user_id}/approve", response_model=UserOut)
+def approve_user(
+    user_id: int,
+    req: ApproveUserRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(AuthService.get_current_user)
+):
+    # Verify current user is admin
+    if current_user.role.lower() != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can approve users and assign roles."
+        )
+        
+    role_lower = req.role.lower()
+    if role_lower not in ["admin", "reviewer", "annotator", "pending"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid role selected."
+        )
+        
+    from app.models.user import User
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+        
+    old_role = user.role
+    user.role = role_lower
+    db.commit()
+    db.refresh(user)
+    
+    AuditService.log_action(
+        user_id=current_user.id,
+        username=current_user.username,
+        action="USER_APPROVE",
+        resource_type="user",
+        resource_id=user.id,
+        details={"approved_user_id": user.id, "old_role": old_role, "new_role": user.role}
+    )
+    
+    return user

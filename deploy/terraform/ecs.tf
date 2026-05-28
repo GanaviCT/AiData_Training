@@ -62,7 +62,7 @@ resource "aws_lb" "external" {
 # Target Group for React Frontend
 resource "aws_lb_target_group" "frontend" {
   name        = "${var.project_name}-tg-frontend"
-  port        = 3000
+  port        = 80
   protocol    = "HTTP"
   vpc_id      = aws_vpc.main.id
   target_type = "ip"
@@ -147,9 +147,11 @@ resource "aws_ecs_task_definition" "backend" {
         }
       ]
       environment = [
-        { name = "DATABASE_URL", value = "postgresql://db_user:db_pass@db_host:5432/platform" },
-        { name = "MONGO_URI", value = "mongodb://mongo_user:mongo_pass@mongo_host:27017/audit_trail" },
-        { name = "REDIS_URL", value = "redis://redis_host:6379/0" }
+        { name = "DATABASE_URL", value = "postgresql://${var.rds_username}:${var.rds_password}@${aws_db_instance.postgres.endpoint}/platform" },
+        { name = "MONGO_URL", value = "mongodb://${var.docdb_username}:${var.docdb_password}@${aws_docdb_cluster.docdb.endpoint}:27017" },
+        { name = "REDIS_HOST", value = aws_elasticache_cluster.redis.cache_nodes[0].address },
+        { name = "REDIS_PORT", value = "6379" },
+        { name = "REDIS_URL", value = "redis://${aws_elasticache_cluster.redis.cache_nodes[0].address}:6379/0" }
       ]
       logConfiguration = {
         logDriver = "awslogs"
@@ -180,8 +182,8 @@ resource "aws_ecs_task_definition" "frontend" {
       essential = true
       portMappings = [
         {
-          containerPort = 3000
-          hostPort      = 3000
+          containerPort = 80
+          hostPort      = 80
         }
       ]
       logConfiguration = {
@@ -236,7 +238,7 @@ resource "aws_ecs_service" "frontend" {
   load_balancer {
     target_group_arn = aws_lb_target_group.frontend.arn
     container_name   = "frontend"
-    container_port   = 3000
+    container_port   = 80
   }
 
   depends_on = [aws_lb_listener.http]

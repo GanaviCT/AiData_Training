@@ -9,6 +9,7 @@ class AnnotationCreate(BaseModel):
     label: str
     confidence: Optional[float] = 1.0
     corrected_label: Optional[str] = None
+    recipient_email: Optional[str] = None
 
 class AnnotationOut(BaseModel):
     id: int

@@ -37,6 +37,23 @@ class AuthService:
             raise credentials_exception
         return user
 
+ROLE_PERMISSIONS = {
+    "admin": [
+        "tasks:create", "tasks:import", "tasks:assign", "tasks:view",
+        "annotations:create", "annotations:view",
+        "qa:submit", "qa:sample",
+        "system:view", "system:backup", "system:debug"
+    ],
+    "reviewer": [
+        "tasks:view", "annotations:view",
+        "qa:submit",
+        "system:view"
+    ],
+    "annotator": [
+        "tasks:view", "annotations:create", "annotations:view"
+    ]
+}
+
 class RoleChecker:
     def __init__(self, allowed_roles: list[str]):
         self.allowed_roles = allowed_roles
@@ -48,3 +65,18 @@ class RoleChecker:
                 detail="You do not have permission to access this resource"
             )
         return current_user
+
+class PermissionChecker:
+    def __init__(self, required_permission: str):
+        self.required_permission = required_permission
+
+    def __call__(self, current_user: User = Depends(AuthService.get_current_user)) -> User:
+        user_role = current_user.role.lower() if current_user.role else "annotator"
+        permissions = ROLE_PERMISSIONS.get(user_role, [])
+        if self.required_permission not in permissions:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"You do not have permission to access this resource. Required permission: {self.required_permission}"
+            )
+        return current_user
+

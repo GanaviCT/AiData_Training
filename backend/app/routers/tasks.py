@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List, Optional
 from app.services.task import TaskService
-from app.services.auth import AuthService, RoleChecker
+from app.services.auth import AuthService, RoleChecker, PermissionChecker
 from app.schemas.task import TaskCreate, TaskUpdate, TaskOut
 from app.models.user import User
 from app.services.audit import AuditService
@@ -14,7 +14,7 @@ router = APIRouter(prefix="/tasks", tags=["Tasks"])
 def create_task(
     task_in: TaskCreate,
     task_service: TaskService = Depends(),
-    current_user: User = Depends(RoleChecker(["admin"]))
+    current_user: User = Depends(PermissionChecker("tasks:create"))
 ):
     import datetime
     if not task_in.lineage_history:
@@ -41,7 +41,7 @@ def create_task(
 def bulk_create_tasks(
     tasks_in: List[TaskCreate],
     task_service: TaskService = Depends(),
-    current_user: User = Depends(RoleChecker(["admin"]))
+    current_user: User = Depends(PermissionChecker("tasks:import"))
 ):
     import datetime
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")

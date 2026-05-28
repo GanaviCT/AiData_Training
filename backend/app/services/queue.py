@@ -223,6 +223,14 @@ class BackgroundQueueService:
                 approved=payload.get("approved"),
                 comments=payload.get("comments")
             )
+        elif email_type == "qa_submission":
+            EmailService.send_qa_submission_email_sync(
+                annotator_username=payload.get("annotator_username"),
+                task_id=payload.get("task_id"),
+                task_type=payload.get("task_type"),
+                recipient_email=payload.get("recipient_email"),
+                annotator_email=payload.get("annotator_email")
+            )
 
     @staticmethod
     def _handle_bulk_import_job(payload: Dict[str, Any]):

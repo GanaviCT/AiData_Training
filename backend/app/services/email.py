@@ -254,3 +254,102 @@ class EmailService:
             logger.info("QA review email successfully sent via SMTP.")
         except Exception as e:
             logger.warning(f"SMTP delivery skipped for QA review: {e} (Email logged to console instead).")
+
+    @staticmethod
+    def send_qa_submission_email(annotator_username: str, task_id: int, task_type: str, recipient_email: str, annotator_email: str = None):
+        from app.services.queue import BackgroundQueueService
+        BackgroundQueueService.enqueue("EMAIL", {
+            "email_type": "qa_submission",
+            "annotator_username": annotator_username,
+            "task_id": task_id,
+            "task_type": task_type,
+            "recipient_email": recipient_email,
+            "annotator_email": annotator_email
+        })
+
+    @staticmethod
+    def send_qa_submission_email_sync(annotator_username: str, task_id: int, task_type: str, recipient_email: str, annotator_email: str = None):
+        subject = f"📥 TrainLyft AI: Task #{task_id:03d} Submitted for QA Review"
+        
+        html_content = f"""
+        <html>
+          <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+            <div style="background-color: #0f172a; padding: 15px; text-align: center; border-radius: 6px 6px 0 0;">
+              <h2 style="color: #38bdf8; margin: 0;">TrainLyft AI Platform</h2>
+              <p style="color: #94a3b8; font-size: 12px; margin: 5px 0 0;">Task QA Queue Notification</p>
+            </div>
+            <div style="padding: 20px;">
+              <p>Hello,</p>
+              <p>A new task has been completed and submitted for QA review by <strong>@{annotator_username}</strong>.</p>
+              
+              <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+                <tr style="background-color: #f8fafc;">
+                  <td style="padding: 10px; border: 1px solid #cbd5e1; font-weight: bold; width: 30%;">Task ID</td>
+                  <td style="padding: 10px; border: 1px solid #cbd5e1;">#{task_id:03d}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 10px; border: 1px solid #cbd5e1; font-weight: bold;">Task Type</td>
+                  <td style="padding: 10px; border: 1px solid #cbd5e1; text-transform: capitalize;">{task_type}</td>
+                </tr>
+                <tr style="background-color: #f8fafc;">
+                  <td style="padding: 10px; border: 1px solid #cbd5e1; font-weight: bold;">Submitted By</td>
+                  <td style="padding: 10px; border: 1px solid #cbd5e1;">@{annotator_username}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 10px; border: 1px solid #cbd5e1; font-weight: bold;">Status</td>
+                  <td style="padding: 10px; border: 1px solid #cbd5e1;"><span style="background-color: #fef3c7; color: #d97706; padding: 3px 8px; border-radius: 12px; font-size: 12px; font-weight: bold;">Awaiting QA Review</span></td>
+                </tr>
+              </table>
+              
+              <p>Please log in to your dashboard to audit this submission.</p>
+              
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="http://192.168.1.97:3000/?page=qa" style="background-color: #0ea5e9; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px; display: inline-block;">Go to QA Review Panel</a>
+              </div>
+              
+              <p style="font-size: 12px; color: #64748b; margin-top: 20px;">
+                <strong>Note:</strong> If you are opening this on your phone, make sure you are connected to the same Wi-Fi network as your Mac. You can also open this link directly in your browser:
+                <br />
+                <code style="background-color: #f1f5f9; color: #0f172a; padding: 4px 8px; border-radius: 4px; display: inline-block; margin-top: 5px; font-size: 11px;">http://192.168.1.97:3000/?page=qa</code>
+              </p>
+            </div>
+            <div style="font-size: 11px; color: #64748b; text-align: center; margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 15px;">
+              This is an automated notification from the TrainLyft AI Platform. Please do not reply directly to this message.
+            </div>
+          </body>
+        </html>
+        """
+        
+        logger.info(f"Triggering QA submission email notification to {recipient_email}")
+        print(f"\n=======================================================")
+        print(f"📧 [QA SUBMISSION EMAIL SENT] To: {recipient_email}")
+        print(f"📧 Subject: {subject}")
+        print(f"📧 Task ID: #{task_id:03d} ({task_type}) | Submitted by: @{annotator_username}")
+        if annotator_email:
+            print(f"📧 Reply-To: {annotator_email}")
+        print(f"=======================================================\n")
+        
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = f"{annotator_username} via TrainLyft AI <{settings.SMTP_USERNAME or 'notifications@trainlyft-ai.com'}>"
+        msg["To"] = recipient_email
+        if annotator_email:
+            msg["Reply-To"] = annotator_email
+        msg.attach(MIMEText(html_content, "html"))
+        
+        try:
+            if settings.SMTP_PORT == 465:
+                server = smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT, timeout=5.0)
+            else:
+                server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=5.0)
+                if settings.SMTP_USE_TLS:
+                    server.starttls()
+            
+            if settings.SMTP_USERNAME and settings.SMTP_PASSWORD:
+                server.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
+                
+            server.sendmail(settings.SMTP_USERNAME or "notifications@trainlyft-ai.com", [recipient_email], msg.as_string())
+            server.quit()
+            logger.info("QA submission email successfully sent via SMTP.")
+        except Exception as e:
+            logger.warning(f"SMTP delivery skipped for QA submission: {e} (Email logged to console instead).")

@@ -69,9 +69,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage }) => {
     { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'annotator', 'reviewer'] },
     { id: 'tasks', name: 'Task Management', icon: ListTodo, roles: ['admin', 'annotator', 'reviewer'] },
     { id: 'qa', name: 'Task QA', icon: ShieldCheck, roles: ['admin', 'reviewer'] },
-    { id: 'agreement', name: 'Agreement (IAA)', icon: Users, roles: ['admin'] },
+    { id: 'agreement', name: 'Agreement (IAA)', icon: Users, roles: ['admin', 'reviewer'] },
     { id: 'audit', name: 'Audit Logs', icon: Database, roles: ['admin'] },
-    { id: 'system-monitor', name: 'System Monitor', icon: Activity, roles: ['admin'] },
+    { id: 'system-monitor', name: 'System Monitor', icon: Activity, roles: ['admin', 'reviewer'] },
     { id: 'settings', name: 'Settings', icon: Settings, roles: ['admin', 'annotator', 'reviewer'] },
   ];
 
@@ -111,37 +111,49 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage }) => {
 
       {/* Navigation Menu */}
       <nav className="flex-1 px-4 py-6 space-y-1.5">
-        {menuItems
-          .filter(item => item.roles.includes(user?.role || ''))
-          .map(item => {
-            const Icon = item.icon;
-            const isActive = activePage === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActivePage(item.id)}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300 ${
-                  isActive
-                    ? 'bg-gradient-to-r from-cyan-500/15 to-indigo-500/15 border border-cyan-500/30 text-cyan-400 shadow-md shadow-cyan-500/5'
-                    : 'border border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <Icon className={`w-5 h-5 ${isActive ? 'text-cyan-400' : 'text-slate-400'}`} />
-                  <span>{item.name}</span>
-                </div>
-                {item.id === 'qa' && qaCount > 0 && (
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full transition-all duration-300 ${
-                    isActive 
-                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30' 
-                      : 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/20'
-                  }`}>
-                    {qaCount}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+        {(() => {
+          const isClientReviewer = user?.role?.toLowerCase() === 'reviewer' && 
+            (user?.email?.endsWith('@client.com') || user?.username === 'client_reviewer');
+
+          return menuItems
+            .filter(item => {
+              const hasRole = item.roles.includes(user?.role || '');
+              if (!hasRole) return false;
+              if (isClientReviewer && (item.id === 'system-monitor' || item.id === 'audit')) {
+                return false;
+              }
+              return true;
+            })
+            .map(item => {
+              const Icon = item.icon;
+              const isActive = activePage === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActivePage(item.id)}
+                  className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300 ${
+                    isActive
+                      ? 'bg-gradient-to-r from-cyan-500/15 to-indigo-500/15 border border-cyan-500/30 text-cyan-400 shadow-md shadow-cyan-500/5'
+                      : 'border border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Icon className={`w-5 h-5 ${isActive ? 'text-cyan-400' : 'text-slate-400'}`} />
+                    <span>{item.name}</span>
+                  </div>
+                  {item.id === 'qa' && qaCount > 0 && (
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full transition-all duration-300 ${
+                      isActive 
+                        ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30' 
+                        : 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/20'
+                    }`}>
+                      {qaCount}
+                    </span>
+                  )}
+                </button>
+              );
+            });
+        })()}
       </nav>
 
       {/* Footer / Logout */}

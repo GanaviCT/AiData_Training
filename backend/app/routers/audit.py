@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, Query
 from typing import List, Optional
-from app.services.auth import AuthService, RoleChecker
+from app.services.auth import AuthService, RoleChecker, PermissionChecker
 from app.services.audit import AuditService
 from app.models.user import User
 
 router = APIRouter(prefix="/audit", tags=["Audit Logs"])
 
-# Require Admin role for viewing audit logs & analytics
-admin_checker = RoleChecker(allowed_roles=["admin"])
+# Require Admin role permissions for viewing audit logs & analytics
+admin_checker = PermissionChecker("system:debug")
 
 @router.get("/logs")
 def get_audit_logs(
